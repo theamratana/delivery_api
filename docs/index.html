@@ -41,7 +41,9 @@
       </div>
     </div>
 
-    <h3>Result</h3>
+  <div id="status" class="muted" style="margin-top:8px"></div>
+
+  <h3>Result</h3>
     <pre id="out">{ /* Click Validate login. If you're already connected, your signed payload will appear. Otherwise, you'll be asked to connect. */ }</pre>
 
     <p class="muted">Next: Paste this JSON into your HTTP client (e.g., Postman) as the request body to <code>POST http://localhost:8081/auth/telegram/verify</code>. Ensure your API is running and <code>TELEGRAM_BOT_TOKEN</code> is set on the server.</p>
@@ -52,8 +54,9 @@
     const out = document.getElementById('out');
     const copyBtn = document.getElementById('copyBtn');
     const botUserInput = document.getElementById('botUser');
-    const validateBtn = document.getElementById('validateBtn');
+  const validateBtn = document.getElementById('validateBtn');
     const connectRow = document.getElementById('connectRow');
+  const statusEl = document.getElementById('status');
 
     const DEFAULT_BOT = 'patience_delivery_bot';
     let telegramUser = null;
@@ -83,9 +86,11 @@
         out.textContent = JSON.stringify(user, null, 2);
         copyBtn.disabled = false;
         connectRow.classList.add('hidden');
+        if (statusEl) statusEl.textContent = 'Telegram auth payload received.';
       } catch (e) {
         console.error('onTelegramAuth error:', e);
         out.textContent = 'Error handling Telegram payload: ' + e;
+        if (statusEl) statusEl.textContent = 'Error handling Telegram payload.';
       }
     };
 
@@ -98,6 +103,19 @@
         w.window['onTelegramAuth'] = onTelegramAuthHandler;
       }
     } catch {}
+
+    if (statusEl) statusEl.textContent = 'Callback attached. Click Validate login or the Telegram button.';
+
+    // Optional: log postMessage events from Telegram widget for debugging
+    window.addEventListener('message', (ev) => {
+      try {
+        if (!ev || !ev.data) return;
+        // Some widgets emit messages; keep this only as a hint
+        if (typeof ev.data === 'object') {
+          console.debug('postMessage event from widget:', ev.data);
+        }
+      } catch {}
+    });
 
     // Initial render with default bot. Keep connect section hidden until validation requested.
     renderWidget();
