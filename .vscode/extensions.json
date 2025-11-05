@@ -1,0 +1,7 @@
+{
+  "recommendations": [
+    "vscjava.vscode-java-pack",      // Extension Pack for Java (includes Red Hat Java, Debugger, Test Runner)
+    "vscjava.vscode-gradle",         // Gradle for Java (import/manage Gradle projects)
+    "vmware.vscode-boot-dev-pack"    // Spring Boot Extension Pack (optional, nice to have)
+  ]
+}

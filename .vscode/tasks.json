@@ -1,0 +1,65 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "gradle build",
+			"type": "shell",
+			"command": "./gradlew",
+			"args": ["build"],
+			"group": "build"
+		},
+		{
+			"label": "gradle bootRun",
+			"type": "shell",
+			"command": "./gradlew",
+			"args": ["bootRun"],
+			"group": "none",
+			"options": {
+				"env": {
+					"DB_URL": "${env:DB_URL}",
+					"DB_USERNAME": "${env:DB_USERNAME}",
+					"DB_PASSWORD": "${env:DB_PASSWORD}"
+				}
+			}
+		}
+		,
+		{
+			"label": "gradle bootRun (8081)",
+			"type": "shell",
+			"command": "./gradlew",
+			"args": ["bootRun"],
+			"group": "none",
+			"options": {
+				"env": {
+					"SERVER_PORT": "8081",
+					"DB_URL": "${env:DB_URL}",
+					"DB_USERNAME": "${env:DB_USERNAME}",
+					"DB_PASSWORD": "${env:DB_PASSWORD}"
+				}
+			}
+		}
+		,
+		{
+			"label": "run api",
+			"type": "shell",
+			"command": "./run-api.sh",
+			"group": "none"
+		},
+		{
+			"label": "Run (Docker 5433 -> 8081)",
+			"type": "shell",
+			"command": "./gradlew",
+			"args": ["bootRun"],
+			"group": "none",
+			"detail": "Sets DB_* and SERVER_PORT for local Docker compose mapping (5433)",
+			"options": {
+				"env": {
+					"DB_URL": "jdbc:postgresql://localhost:5433/deliverydb",
+					"DB_USERNAME": "postgres",
+					"DB_PASSWORD": "postgres",
+					"SERVER_PORT": "8081"
+				}
+			}
+		}
+	]
+}

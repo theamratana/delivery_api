@@ -1,0 +1,26 @@
+{
+  // Ensure VS Code Java uses JDK 17 and imports Gradle correctly
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-17",
+      "path": "C:/Program Files/Microsoft/jdk-17.0.17.10-hotspot",
+      "default": true
+    }
+  ],
+  // Point JDT LS directly to the JDK home (helps on some Windows setups)
+  "java.jdt.ls.java.home": "C:/Program Files/Microsoft/jdk-17.0.17.10-hotspot",
+
+  // Auto-configure the project when build files change
+  "java.configuration.updateBuildConfiguration": "automatic",
+
+  // Prefer Gradle import with wrapper
+  "java.import.gradle.enabled": true,
+  "java.import.gradle.wrapper.enabled": true,
+
+  // Helpful fallback if the Gradle import isn’t active yet; points to Maven-style layout
+  "java.project.sourcePaths": [
+    "src/main/java",
+    "src/test/java"
+  ],
+  "java.compile.nullAnalysis.mode": "automatic"
+}

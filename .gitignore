@@ -1,0 +1,25 @@
+# Build and IDE
+/build/
+/.gradle/
+/.idea/
+/.vscode/*.log
+.DS_Store
+
+# Logs and local state
+/logs/
+/*.log
+server.log
+server_*.log
+/.pid_*
+
+# Gradle caches/zip
+/gradle.zip
+
+# Generated wrapper (keep wrapper files, ignore caches)
+!gradle/
+!gradle/wrapper/
+
+# Misc
+*.iml
+*.class
+.env
