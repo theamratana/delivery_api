@@ -14,29 +14,35 @@
     input[type=text] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
     button { padding: 8px 12px; border: 1px solid #444; background: #111; color: #fff; border-radius: 4px; cursor: pointer; }
     button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .hidden { display: none; }
+    .stack { display: flex; gap: 8px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
   <div class="card">
     <h2>Telegram Login – Local/QA Test</h2>
-    <p class="muted">Use this page to get the Telegram Login payload (id, first_name, username, auth_date, hash) from your Telegram session, then paste it into your API call <code>/auth/telegram/verify</code>.</p>
+    <p class="muted">Use this page to validate your Telegram Login and get the signed payload (id, first_name, username, auth_date, hash). If you haven't connected yet, you'll be prompted to connect.</p>
 
     <div class="row">
-      <label for="botUser">Bot username</label>
-      <input id="botUser" type="text" value="BOT_USERNAME_HERE" />
-      <div class="muted">Example: <code>patience_delivery_bot</code> (without @)</div>
+      <label for="botUser">Bot username (locked)</label>
+      <input id="botUser" type="text" value="patience_delivery_bot" readonly />
+      <div class="muted">This uses your bot <code>patience_delivery_bot</code>.</div>
     </div>
 
-    <div class="row">
+    <div id="connectRow" class="row hidden">
+      <div class="muted" style="margin-bottom:8px">You're not connected yet. Click below to connect with Telegram:</div>
       <div id="widgetMount"></div>
     </div>
 
     <div class="row">
-      <button id="copyBtn" disabled>Copy JSON to clipboard</button>
+      <div class="stack">
+        <button id="validateBtn">Validate login</button>
+        <button id="copyBtn" disabled>Copy JSON to clipboard</button>
+      </div>
     </div>
 
     <h3>Result</h3>
-    <pre id="out">{ /* Click the Telegram button above; your signed payload will appear here. */ }</pre>
+    <pre id="out">{ /* Click Validate login. If you're already connected, your signed payload will appear. Otherwise, you'll be asked to connect. */ }</pre>
 
     <p class="muted">Next: Paste this JSON into your HTTP client (e.g., Postman) as the request body to <code>POST http://localhost:8081/auth/telegram/verify</code>. Ensure your API is running and <code>TELEGRAM_BOT_TOKEN</code> is set on the server.</p>
   </div>
@@ -46,15 +52,15 @@
     const out = document.getElementById('out');
     const copyBtn = document.getElementById('copyBtn');
     const botUserInput = document.getElementById('botUser');
+    const validateBtn = document.getElementById('validateBtn');
+    const connectRow = document.getElementById('connectRow');
+
+    const DEFAULT_BOT = 'patience_delivery_bot';
+    let telegramUser = null;
 
     function renderWidget() {
       mount.innerHTML = '';
-      const botUser = (botUserInput.value || '').trim();
-      if (!botUser || botUser === 'BOT_USERNAME_HERE') {
-        out.textContent = 'Please enter your bot username first.';
-        copyBtn.disabled = true;
-        return;
-      }
+      const botUser = DEFAULT_BOT;
 
   const s = document.createElement('script');
   s.async = true;
@@ -73,8 +79,10 @@
       try {
         // Keep a reference for debugging
         globalThis._lastTelegramUser = user;
+        telegramUser = user;
         out.textContent = JSON.stringify(user, null, 2);
         copyBtn.disabled = false;
+        connectRow.classList.add('hidden');
       } catch (e) {
         console.error('onTelegramAuth error:', e);
         out.textContent = 'Error handling Telegram payload: ' + e;
@@ -91,9 +99,21 @@
       }
     } catch {}
 
-    botUserInput.addEventListener('change', renderWidget);
-    botUserInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') renderWidget(); });
+    // Initial render with default bot. Keep connect section hidden until validation requested.
     renderWidget();
+
+    validateBtn.addEventListener('click', () => {
+      if (telegramUser) {
+        out.textContent = JSON.stringify(telegramUser, null, 2);
+        copyBtn.disabled = false;
+        connectRow.classList.add('hidden');
+      } else {
+        // Reveal the connect area and focus the button
+        connectRow.classList.remove('hidden');
+        out.textContent = 'Not connected yet. Click the Telegram button above to connect.';
+        copyBtn.disabled = true;
+      }
+    });
 
     copyBtn.addEventListener('click', async () => {
       try {
