@@ -67,10 +67,29 @@
   mount.appendChild(s);
     }
 
-    globalThis.onTelegramAuth = function(user) {
-      out.textContent = JSON.stringify(user, null, 2);
-      copyBtn.disabled = false;
-    }
+    // Telegram widget calls window[onauth] with the user payload.
+    // Define handler first, then attach to both globalThis and window (if present).
+    const onTelegramAuthHandler = function(user) {
+      try {
+        // Keep a reference for debugging
+        globalThis._lastTelegramUser = user;
+        out.textContent = JSON.stringify(user, null, 2);
+        copyBtn.disabled = false;
+      } catch (e) {
+        console.error('onTelegramAuth error:', e);
+        out.textContent = 'Error handling Telegram payload: ' + e;
+      }
+    };
+
+    // Attach to the global scope (works in modern browsers)
+    globalThis.onTelegramAuth = onTelegramAuthHandler;
+    // Also attach to window if available (what the Telegram widget uses under the hood)
+    try {
+      const w = /** @type {any} */ (globalThis);
+      if (w && w.window) {
+        w.window['onTelegramAuth'] = onTelegramAuthHandler;
+      }
+    } catch {}
 
     botUserInput.addEventListener('change', renderWidget);
     botUserInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') renderWidget(); });
