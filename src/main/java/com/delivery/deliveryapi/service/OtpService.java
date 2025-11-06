@@ -21,6 +21,7 @@ import com.delivery.deliveryapi.model.User;
 import com.delivery.deliveryapi.repo.AuthIdentityRepository;
 import com.delivery.deliveryapi.repo.OtpAttemptRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
+import com.delivery.deliveryapi.service.CompanyAssignmentService;
 
 @Service
 public class OtpService {
@@ -28,6 +29,7 @@ public class OtpService {
     private final OtpAttemptRepository attempts;
     private final UserRepository users;
     private final AuthIdentityRepository identities;
+    private final CompanyAssignmentService companyAssignmentService;
     private final TelegramBotClient tg;
 
     private static final SecureRandom RNG = new SecureRandom();
@@ -37,10 +39,12 @@ public class OtpService {
     public OtpService(OtpAttemptRepository attempts,
                       UserRepository users,
                       AuthIdentityRepository identities,
+                      CompanyAssignmentService companyAssignmentService,
                       TelegramBotClient tg) {
         this.attempts = attempts;
         this.users = users;
         this.identities = identities;
+        this.companyAssignmentService = companyAssignmentService;
         this.tg = tg;
     }
 
@@ -168,10 +172,13 @@ public class OtpService {
             User nu = new User();
             nu.setPhoneE164(a.getPhoneE164());
             nu.setActive(true);
-            nu.setPlaceholder(true);
+            nu.setIncomplete(true);
             nu.setUsername("u_" + a.getPhoneE164());
             return users.save(nu);
         });
+
+        // Handle automatic company assignment for pending employee invitations
+        companyAssignmentService.handlePhoneVerificationAssignment(u, a.getPhoneE164());
 
         // Link Telegram identity if chatId is known
         if (a.getChatId() != null) {

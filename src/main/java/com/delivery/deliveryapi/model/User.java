@@ -1,17 +1,31 @@
 package com.delivery.deliveryapi.model;
 
-import jakarta.persistence.*;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.OffsetDateTime;
-import java.util.UUID;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Transient;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 
 @Entity
 @Table(name = "users",
     uniqueConstraints = {
         @UniqueConstraint(name = "uk_users_username", columnNames = {"username"}),
-        @UniqueConstraint(name = "uk_users_email", columnNames = {"email"})
+        @UniqueConstraint(name = "uk_users_email", columnNames = {"email"}),
+        @UniqueConstraint(name = "uk_users_phone_e164", columnNames = {"phone_e164"})
     },
     indexes = {
         @Index(name = "idx_users_created_at", columnList = "created_at"),
@@ -51,8 +65,20 @@ public class User {
     @Column(name = "email_verified_at")
     private OffsetDateTime emailVerifiedAt;
 
-    @Column(name = "is_placeholder", nullable = false)
-    private boolean placeholder = false;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "user_type")
+    private UserType userType;
+
+    @ManyToOne
+    @JoinColumn(name = "company_id")
+    private Company company;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "user_role")
+    private UserRole userRole;
+
+    @Column(name = "is_incomplete", nullable = false, columnDefinition = "boolean default false")
+    private boolean incomplete = false;
 
     @Column(name = "active", nullable = false)
     private boolean active = true;
@@ -87,8 +113,14 @@ public class User {
     public void setEmail(String email) { this.email = email; }
     public OffsetDateTime getEmailVerifiedAt() { return emailVerifiedAt; }
     public void setEmailVerifiedAt(OffsetDateTime emailVerifiedAt) { this.emailVerifiedAt = emailVerifiedAt; }
-    public boolean isPlaceholder() { return placeholder; }
-    public void setPlaceholder(boolean placeholder) { this.placeholder = placeholder; }
+    public UserType getUserType() { return userType; }
+    public void setUserType(UserType userType) { this.userType = userType; }
+    public Company getCompany() { return company; }
+    public void setCompany(Company company) { this.company = company; }
+    public UserRole getUserRole() { return userRole; }
+    public void setUserRole(UserRole userRole) { this.userRole = userRole; }
+    public boolean isIncomplete() { return incomplete; }
+    public void setIncomplete(boolean incomplete) { this.incomplete = incomplete; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
     public OffsetDateTime getLastLoginAt() { return lastLoginAt; }

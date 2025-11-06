@@ -60,35 +60,41 @@ cmd="${1:-start}"
 
 case "$cmd" in
 	stop)
-		echo "Stopping anything bound to :${SERVER_PORT}..."
-		kill_on_port "$SERVER_PORT"
-		echo "Done."
+		echo "Stopping API server on port ${SERVER_PORT}..."
+		if port_in_use "$SERVER_PORT"; then
+			kill_on_port "$SERVER_PORT"
+			echo "✅ API server stopped successfully."
+		else
+			echo "ℹ️  No API server running on port ${SERVER_PORT}."
+		fi
 		;;
 	status)
 		if port_in_use "$SERVER_PORT"; then
-			echo "Port ${SERVER_PORT} is IN USE"
+			echo "✅ Port ${SERVER_PORT} is IN USE (API server running)"
 			exit 0
 		else
-			echo "Port ${SERVER_PORT} is FREE"
+			echo "ℹ️  Port ${SERVER_PORT} is FREE (no API server running)"
 			exit 1
 		fi
 		;;
 	restart)
+		echo "Restarting API server..."
 		"$0" stop || true
-		exec "$0" start
+		sleep 2
+		"$0" start
 		;;
 	start|*)
 		# Ensure only 8081 is used: free it first if needed
 		if port_in_use "$SERVER_PORT"; then
-			echo "Port ${SERVER_PORT} is busy. Attempting to stop existing process..."
+			echo "Port ${SERVER_PORT} is busy. Stopping existing process..."
 			kill_on_port "$SERVER_PORT"
 			sleep 1
 			if port_in_use "$SERVER_PORT"; then
-				echo "ERROR: Could not free port ${SERVER_PORT}." >&2
+				echo "❌ ERROR: Could not free port ${SERVER_PORT}." >&2
 				exit 1
 			fi
 		fi
-			echo "Starting API on port ${SERVER_PORT}..."
+			echo "🚀 Starting API server on port ${SERVER_PORT}..."
 			if [ -x "./gradlew" ]; then
 				./gradlew bootRun &
 				echo $! > .pid_api
@@ -96,5 +102,6 @@ case "$cmd" in
 				./gradle-8.5/bin/gradle bootRun &
 				echo $! > .pid_api
 			fi
+			echo "✅ API server started (PID: $(cat .pid_api))"
 		;;
 esac

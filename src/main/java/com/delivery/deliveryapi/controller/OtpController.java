@@ -5,6 +5,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,14 +46,30 @@ public class OtpController {
     }
 
     public record VerifyBodyDto(@NotBlank String attemptId, @NotBlank String code) {}
+    public record OtpVerifyResponse(String token, UUID userId, String displayName, String username, String provider) {}
 
     @PostMapping("/verify")
-    public ResponseEntity<Map<String, Object>> verify(@Valid @RequestBody VerifyBodyDto body) {
-        UUID id = UUID.fromString(body.attemptId());
-        Optional<User> user = otpService.verifyCode(id, body.code());
-        if (user.isEmpty()) return ResponseEntity.status(400).body(Map.of("error", "invalid_or_expired_code"));
-        User u = user.get();
-        String token = jwtService.generateToken(u.getId(), u.getUsername(), Map.of("provider", "TELEGRAM-OTP"));
-        return ResponseEntity.ok(Map.of("token", token, "userId", u.getId()));
+    public ResponseEntity<Object> verify(@Valid @RequestBody VerifyBodyDto body) {
+        try {
+            UUID id = UUID.fromString(body.attemptId());
+            Optional<User> user = otpService.verifyCode(id, body.code());
+            if (user.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Invalid or expired verification code"));
+            }
+            User u = user.get();
+            String token = jwtService.generateToken(u.getId(), u.getUsername(), Map.of("provider", "TELEGRAM-OTP"));
+            String displayName = u.getFullName();
+            if (displayName == null) {
+                displayName = u.getDisplayName() != null ? u.getDisplayName() : u.getUsername();
+            }
+            return ResponseEntity.ok(new OtpVerifyResponse(token, u.getId(), displayName, u.getUsername(), "TELEGRAM-OTP"));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("error", "Phone number already registered or constraint violation"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Verification failed"));
+        }
     }
 }

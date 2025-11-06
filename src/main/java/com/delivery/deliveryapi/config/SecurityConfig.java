@@ -27,7 +27,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/api/**", "/auth/**", "/bot/**").permitAll()
+            .requestMatchers("/auth/otp/**", "/auth/telegram/verify", "/auth/dev/**", "/bot/**").permitAll()
+            .requestMatchers("/auth/profile").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class);

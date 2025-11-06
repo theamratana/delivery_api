@@ -1,56 +1,93 @@
 package com.delivery.deliveryapi.controller;
 
-import com.delivery.deliveryapi.model.AuthIdentity;
-import com.delivery.deliveryapi.model.AuthProvider;
-import com.delivery.deliveryapi.model.User;
-import com.delivery.deliveryapi.model.UserAudit;
-import com.delivery.deliveryapi.repo.UserAuditRepository;
-import com.delivery.deliveryapi.repo.AuthIdentityRepository;
-import com.delivery.deliveryapi.repo.UserRepository;
-import com.delivery.deliveryapi.service.TelegramAuthService;
-import com.delivery.deliveryapi.security.JwtService;
+import java.time.OffsetDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.springframework.beans.factory.annotation.Value;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.time.OffsetDateTime;
-import java.util.*;
+import com.delivery.deliveryapi.model.AuthIdentity;
+import com.delivery.deliveryapi.model.AuthProvider;
+import com.delivery.deliveryapi.model.Company;
+import com.delivery.deliveryapi.model.Employee;
+import com.delivery.deliveryapi.model.PendingEmployee;
+import com.delivery.deliveryapi.model.User;
+import com.delivery.deliveryapi.model.UserAudit;
+import com.delivery.deliveryapi.model.UserRole;
+import com.delivery.deliveryapi.model.UserType;
+import com.delivery.deliveryapi.repo.AuthIdentityRepository;
+import com.delivery.deliveryapi.repo.CompanyRepository;
+import com.delivery.deliveryapi.repo.EmployeeRepository;
+import com.delivery.deliveryapi.repo.PendingEmployeeRepository;
+import com.delivery.deliveryapi.repo.UserAuditRepository;
+import com.delivery.deliveryapi.repo.UserRepository;
+import com.delivery.deliveryapi.security.JwtService;
+import com.delivery.deliveryapi.service.CompanyAssignmentService;
+import com.delivery.deliveryapi.service.TelegramAuthService;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
+    private static final String AUDIT_TYPE_PROFILE_UPDATE = "PROFILE_UPDATE";
+    private static final String AUDIT_SOURCE_TELEGRAM = "TELEGRAM";
+
     private final TelegramAuthService telegramAuthService;
     private final JwtService jwtService;
     private final boolean devTokenEnabled;
     private final UserRepository userRepository;
     private final AuthIdentityRepository identityRepository;
     private final UserAuditRepository userAuditRepository;
+    private final CompanyRepository companyRepository;
+    private final EmployeeRepository employeeRepository;
+    private final PendingEmployeeRepository pendingEmployeeRepository;
+    private final CompanyAssignmentService companyAssignmentService;
 
     public AuthController(TelegramAuthService telegramAuthService,
                           UserRepository userRepository,
                           AuthIdentityRepository identityRepository,
                           JwtService jwtService,
                           UserAuditRepository userAuditRepository,
+                          CompanyRepository companyRepository,
+                          EmployeeRepository employeeRepository,
+                          PendingEmployeeRepository pendingEmployeeRepository,
+                          CompanyAssignmentService companyAssignmentService,
                           @Value("${jwt.dev-enabled:false}") boolean devTokenEnabled) {
         this.telegramAuthService = telegramAuthService;
         this.userRepository = userRepository;
         this.identityRepository = identityRepository;
         this.jwtService = jwtService;
         this.userAuditRepository = userAuditRepository;
+        this.companyRepository = companyRepository;
+        this.employeeRepository = employeeRepository;
+        this.pendingEmployeeRepository = pendingEmployeeRepository;
+        this.companyAssignmentService = companyAssignmentService;
         this.devTokenEnabled = devTokenEnabled;
     }
 
     public static class TelegramVerifyRequest {
-        public String id;
+        @JsonProperty("id") public String id;
         @JsonProperty("first_name") public String firstName;
         @JsonProperty("last_name") public String lastName;
-        public String username;
+        @JsonProperty("username") public String username;
         @JsonProperty("photo_url") public String photoUrl;
         @JsonProperty("auth_date") public String authDate;
-        public String hash;
+        @JsonProperty("hash") public String hash;
 
         public Map<String, String> toMap() {
             Map<String, String> m = new HashMap<>();
@@ -69,7 +106,7 @@ public class AuthController {
 
     @PostMapping("/telegram/verify")
     @Transactional
-    public ResponseEntity<?> verifyTelegram(@RequestBody TelegramVerifyRequest req) {
+    public ResponseEntity<Object> verifyTelegram(@RequestBody TelegramVerifyRequest req) {
         Map<String, String> payload = req.toMap();
         if (!telegramAuthService.verifyLoginPayload(payload)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -101,11 +138,11 @@ public class AuthController {
             user.setAvatarUrl(req.photoUrl);
             user.setLastLoginAt(OffsetDateTime.now());
             // Audit changes
-            auditUserChanges(user.getId(), "displayName", oldDisplayName, displayNameFrom(req), "TELEGRAM");
-            auditUserChanges(user.getId(), "firstName", oldFirstName, req.firstName, "TELEGRAM");
-            auditUserChanges(user.getId(), "lastName", oldLastName, req.lastName, "TELEGRAM");
-            auditUserChanges(user.getId(), "username", oldUsername, req.username, "TELEGRAM");
-            auditUserChanges(user.getId(), "avatarUrl", oldAvatarUrl, req.photoUrl, "TELEGRAM");
+            auditUserChanges(user.getId(), "displayName", oldDisplayName, displayNameFrom(req), AUDIT_SOURCE_TELEGRAM);
+            auditUserChanges(user.getId(), "firstName", oldFirstName, req.firstName, AUDIT_SOURCE_TELEGRAM);
+            auditUserChanges(user.getId(), "lastName", oldLastName, req.lastName, AUDIT_SOURCE_TELEGRAM);
+            auditUserChanges(user.getId(), "username", oldUsername, req.username, AUDIT_SOURCE_TELEGRAM);
+            auditUserChanges(user.getId(), "avatarUrl", oldAvatarUrl, req.photoUrl, AUDIT_SOURCE_TELEGRAM);
         } else {
             user = new User();
             user.setDisplayName(displayNameFrom(req));
@@ -126,16 +163,25 @@ public class AuthController {
         }
         identityRepository.save(identity);
 
-    String display = user.getFullName() != null ? user.getFullName() :
-        (user.getDisplayName() != null ? user.getDisplayName() : user.getUsername());
+        // Check for pending invitation by phone number (will be checked during profile update)
+        // Auto-assignment happens when user updates their phone number in profile
+
+    String display;
+    if (user.getFullName() != null) {
+        display = user.getFullName();
+    } else if (user.getDisplayName() != null) {
+        display = user.getDisplayName();
+    } else {
+        display = user.getUsername();
+    }
 
     String token = jwtService.generateToken(
         user.getId(),
         user.getUsername(),
-        Map.of("provider", "TELEGRAM")
+        Map.of("provider", AUDIT_SOURCE_TELEGRAM)
     );
 
-    return ResponseEntity.ok(new AuthResponse(token, user.getId(), display, user.getUsername(), "TELEGRAM"));
+    return ResponseEntity.ok(new AuthResponse(token, user.getId(), display, user.getUsername(), AUDIT_SOURCE_TELEGRAM));
     }
 
     private void auditUserChanges(UUID userId, String fieldName, String oldValue, String newValue, String source) {
@@ -160,39 +206,361 @@ public class AuthController {
     }
 
     @GetMapping("/dev/token/{userId}")
-    public ResponseEntity<?> devToken(@PathVariable UUID userId) {
+    public ResponseEntity<Object> devToken(@PathVariable UUID userId) {
+        if (userId == null) {
+            return ResponseEntity.badRequest().build();
+        }
         if (!devTokenEnabled) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "dev_token_disabled"));
         }
         return userRepository.findById(userId)
-                .<ResponseEntity<?>>map(u -> ResponseEntity.ok(Map.of(
+                .<ResponseEntity<Object>>map(u -> ResponseEntity.ok(Map.of(
                         "token", jwtService.generateToken(u.getId(), u.getUsername(), Map.of("provider", "DEV")),
                         "userId", u.getId()
                 )))
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PostMapping("/dev/token/new")
+    public record ProfileUpdateRequest(UserType userType, String firstName, String lastName, String displayName, String companyName) {}
+
+    public record ProfileResponse(UUID id, String displayName, String username, String firstName, String lastName, UserType userType, UserRole userRole, UUID companyId, String companyName, boolean incomplete) {}
+
+    @GetMapping("/profile")
+    @SuppressWarnings("null")
+    public ResponseEntity<ProfileResponse> getProfile() {
+        // Get current user from security context
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID userId;
+        try {
+            userId = UUID.fromString(userIdStr);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        Optional<User> optUser = userRepository.findById(userId);
+        if (optUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User user = optUser.get();
+        return ResponseEntity.ok(new ProfileResponse(
+            user.getId(),
+            user.getDisplayName(),
+            user.getUsername(),
+            user.getFirstName(),
+            user.getLastName(),
+            user.getUserType(),
+            user.getUserRole(),
+            user.getCompany() != null ? user.getCompany().getId() : null,
+            user.getCompany() != null ? user.getCompany().getName() : null,
+            user.isIncomplete()
+        ));
+    }
+
+    @PutMapping("/profile")
     @Transactional
-    public ResponseEntity<?> devNewToken() {
-        if (!devTokenEnabled) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "dev_token_disabled"));
+    public ResponseEntity<Object> updateProfile(@RequestBody ProfileUpdateRequest req) {
+        // Get current user from security context
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID userId;
+        try {
+            userId = UUID.fromString(userIdStr);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        Optional<User> optUser = userRepository.findById(userId);
+        if (optUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User user = optUser.get();
+
+        // Capture old values
+        UserType oldUserType = user.getUserType();
+        String oldFirstName = user.getFirstName();
+        String oldLastName = user.getLastName();
+        String oldDisplayName = user.getDisplayName();
+        String oldCompanyName = user.getCompany() != null ? user.getCompany().getName() : null;
+
+        // Update fields (phone number updates are not allowed for security reasons)
+        if (req.userType != null) user.setUserType(req.userType);
+        if (req.firstName != null) user.setFirstName(req.firstName);
+        if (req.lastName != null) user.setLastName(req.lastName);
+        if (req.displayName != null) user.setDisplayName(req.displayName);
+        // Note: phoneNumber updates are disabled for security - changing phone requires re-verification
+
+        // Handle company
+        if (req.companyName != null && !req.companyName.trim().isEmpty()) {
+            String companyNameTrimmed = req.companyName.trim();
+
+            // If user already has a company
+            if (user.getCompany() != null) {
+                // If user is OWNER of their company, allow them to rename it
+                if (user.getUserRole() == UserRole.OWNER) {
+                    // Update existing company name
+                    user.getCompany().setName(companyNameTrimmed);
+                    companyRepository.save(user.getCompany());
+                } else {
+                    // Non-owners cannot change company
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "Cannot change company. Please leave your current company first."));
+                }
+            } else {
+                // User has no company, create new one or join existing
+                Optional<Company> optCompany = companyRepository.findByName(companyNameTrimmed);
+                if (optCompany.isPresent()) {
+                    Company company = optCompany.get();
+                    // If joining existing company, check if this company has any users - if not, make them OWNER
+                    long userCount = userRepository.countByCompanyId(company.getId());
+                    if (userCount == 0) {
+                        user.setUserRole(UserRole.OWNER);
+                    }
+                    user.setCompany(company);
+                } else {
+                    // Create new company and make user OWNER
+                    Company company = new Company(companyNameTrimmed);
+                    company = companyRepository.save(company);
+                    user.setCompany(company);
+                    user.setUserRole(UserRole.OWNER);
+
+                    // Create employee record for the owner (only if one doesn't exist)
+                    Optional<Employee> existingEmployee = employeeRepository.findByUserIdAndCompanyId(userId, company.getId());
+                    if (existingEmployee.isEmpty()) {
+                        Employee employee = new Employee(user, company, UserRole.OWNER);
+                        employeeRepository.save(employee);
+                    }
+                }
+            }
         }
 
-        // Create a minimal placeholder user for development/testing
-        User u = new User();
-        String uname = ("dev_" + UUID.randomUUID().toString().substring(0, 8)).toLowerCase();
-        u.setUsername(uname);
-        u.setDisplayName("Dev User");
-        u.setPlaceholder(true);
-        u.setActive(true);
-        u = userRepository.save(u);
+        // If incomplete, set to false after update
+        if (user.isIncomplete()) {
+            user.setIncomplete(false);
+        }
 
-        String token = jwtService.generateToken(u.getId(), u.getUsername(), Map.of("provider", "DEV"));
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                "token", token,
-                "userId", u.getId(),
-                "username", u.getUsername()
-        ));
+        userRepository.save(user);
+
+        // Note: Phone number updates are disabled for security reasons
+        // Automatic assignment happens during initial OTP verification via handlePhoneVerificationAssignment()
+
+        // Audit changes (phone number changes are not allowed)
+        auditUserChanges(userId, "userType", oldUserType != null ? oldUserType.name() : null, req.userType != null ? req.userType.name() : null, AUDIT_TYPE_PROFILE_UPDATE);
+        auditUserChanges(userId, "firstName", oldFirstName, req.firstName, AUDIT_TYPE_PROFILE_UPDATE);
+        auditUserChanges(userId, "lastName", oldLastName, req.lastName, AUDIT_TYPE_PROFILE_UPDATE);
+        auditUserChanges(userId, "displayName", oldDisplayName, req.displayName, AUDIT_TYPE_PROFILE_UPDATE);
+        auditUserChanges(userId, "companyName", oldCompanyName, req.companyName, AUDIT_TYPE_PROFILE_UPDATE);
+        // Note: phoneNumber audit removed since phone updates are disabled
+
+        return ResponseEntity.ok(Map.of("message", "Profile updated successfully"));
+    }
+
+    // This method should be called when phone number is first verified during OTP process
+    // It handles automatic company assignment for pending employee invitations
+    @Transactional
+    public void handlePhoneVerificationAssignment(User user, String phoneNumber) {
+        companyAssignmentService.handlePhoneVerificationAssignment(user, phoneNumber);
+    }
+
+    // QR Invitation endpoints
+
+    @PostMapping("/companies/{companyId}/add-employee")
+    public ResponseEntity<Object> addEmployee(@PathVariable UUID companyId, @RequestBody AddEmployeeRequest req) {
+        // Check if current user has permission to add employees
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID userId = UUID.fromString(userIdStr);
+        Optional<User> optUser = userRepository.findById(userId);
+        if (optUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User user = optUser.get();
+
+        // Check company membership and role permissions
+        if (user.getCompany() == null || !user.getCompany().getId().equals(companyId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "You must be a member of this company"));
+        }
+
+        // Check if user has permission to add the requested role
+        boolean canAssign = false;
+        String errorMessage = "Insufficient permissions to add employee";
+
+        if (user.getUserRole() == UserRole.OWNER) {
+            // Owners can add any role
+            canAssign = true;
+        } else if (user.getUserRole() == UserRole.MANAGER) {
+            // Managers can add STAFF and DRIVER roles
+            if (req.role == UserRole.STAFF || req.role == UserRole.DRIVER) {
+                canAssign = true;
+            } else {
+                errorMessage = "Managers can only add staff and driver employees";
+            }
+        } else {
+            errorMessage = "Only owners and managers can add employees";
+        }
+
+        if (!canAssign) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", errorMessage));
+        }
+
+        // Check if a pending employee already exists for this phone number and company
+        if (pendingEmployeeRepository.existsByPhoneE164AndCompanyId(req.phoneNumber, companyId)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "An employee invitation already exists for this phone number"));
+        }
+
+        // Check if phone number already belongs to an existing user
+        Optional<User> existingUser = userRepository.findByPhoneE164(req.phoneNumber);
+        if (existingUser.isPresent()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "This phone number is already registered to another user"));
+        }
+
+        // Check if phone number has active pending invitations in any company
+        Optional<PendingEmployee> activePending = pendingEmployeeRepository.findActiveByPhone(req.phoneNumber, java.time.Instant.now());
+        if (activePending.isPresent()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "This phone number has a pending invitation in another company"));
+        }
+
+        try {
+            // Get the company
+            Optional<Company> companyOpt = companyRepository.findById(companyId);
+            if (companyOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Company not found"));
+            }
+            Company company = companyOpt.get();
+
+            // Create pending employee record
+            PendingEmployee pendingEmployee = new PendingEmployee();
+            pendingEmployee.setPhoneE164(req.phoneNumber);
+            pendingEmployee.setCompany(company);
+            pendingEmployee.setRole(req.role);
+            pendingEmployee.setExpiresAt(java.time.Instant.now().plusSeconds(7L * 24 * 60 * 60)); // 7 days
+
+            pendingEmployeeRepository.save(pendingEmployee);
+
+            return ResponseEntity.ok(Map.of(
+                "message", "Employee invitation created successfully",
+                "phoneNumber", pendingEmployee.getPhoneE164(),
+                "role", pendingEmployee.getRole(),
+                "expiresAt", pendingEmployee.getExpiresAt()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to create employee invitation"));
+        }
+    }
+
+    public record AddEmployeeRequest(UserRole role, String phoneNumber) {}
+
+    @PostMapping("/leave-company")
+    @Transactional
+    public ResponseEntity<Object> leaveCompany() {
+        // Get current user
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID userId = UUID.fromString(userIdStr);
+        Optional<User> optUser = userRepository.findById(userId);
+        if (optUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User user = optUser.get();
+
+        // Check if user is in a company
+        if (user.getCompany() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "User is not part of any company"));
+        }
+
+        // Deactivate employee record
+        Optional<Employee> employeeOpt = employeeRepository.findByUserIdAndCompanyId(userId, user.getCompany().getId());
+        if (employeeOpt.isPresent()) {
+            Employee employee = employeeOpt.get();
+            employee.setActive(false);
+            employeeRepository.save(employee);
+        }
+
+        // Remove user from company
+        user.setCompany(null);
+        user.setUserRole(null);
+        userRepository.save(user);
+
+        return ResponseEntity.ok(Map.of("message", "Successfully left company"));
+    }
+
+    public record EmployeeInfo(UUID id, String displayName, String firstName, String lastName, String phoneNumber, UserRole role, String status, String invitedAt, String joinedAt) {}
+    public record CompanyEmployeesResponse(List<EmployeeInfo> employees, int totalCount) {}
+
+    @GetMapping("/companies/{companyId}/employees")
+    public ResponseEntity<Object> getCompanyEmployees(@PathVariable UUID companyId) {
+        // Check if current user has permission to view employees
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID userId = UUID.fromString(userIdStr);
+        Optional<User> optUser = userRepository.findById(userId);
+        if (optUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User user = optUser.get();
+
+        // Check if user is a member of the company
+        if (user.getCompany() == null || !user.getCompany().getId().equals(companyId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "You must be a member of this company"));
+        }
+
+        // Only owners and managers can view employees
+        if (user.getUserRole() != UserRole.OWNER && user.getUserRole() != UserRole.MANAGER) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Only owners and managers can view employees"));
+        }
+
+        // Get active employees
+        List<Employee> activeEmployees = employeeRepository.findByCompanyIdAndActive(companyId, true);
+
+        // Get pending employees
+        var pendingEmployees = pendingEmployeeRepository.findByCompanyIdAndExpiresAtAfter(companyId, java.time.Instant.now());
+
+        // Combine into response
+        List<EmployeeInfo> employeeInfos = new java.util.ArrayList<>();
+
+        // Add active employees
+        for (Employee emp : activeEmployees) {
+            employeeInfos.add(new EmployeeInfo(
+                emp.getUser().getId(),
+                emp.getUser().getDisplayName(),
+                emp.getUser().getFirstName(),
+                emp.getUser().getLastName(),
+                emp.getUser().getPhoneE164(),
+                emp.getUserRole(),
+                "ACTIVE",
+                null, // invitedAt not applicable for active employees
+                emp.getCreatedAt() != null ? emp.getCreatedAt().toString() : null
+            ));
+        }
+
+        // Add pending employees
+        for (var pendingEmployee : pendingEmployees) {
+            employeeInfos.add(new EmployeeInfo(
+                null, // no user ID for pending employees
+                null, // no display name
+                null, // no first name
+                null, // no last name
+                pendingEmployee.getPhoneE164(),
+                pendingEmployee.getRole(),
+                "PENDING",
+                pendingEmployee.getCreatedAt() != null ? pendingEmployee.getCreatedAt().toString() : null,
+                null // joinedAt not applicable for pending employees
+            ));
+        }
+
+        return ResponseEntity.ok(new CompanyEmployeesResponse(employeeInfos, employeeInfos.size()));
     }
 }

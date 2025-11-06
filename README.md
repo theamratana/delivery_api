@@ -235,6 +235,33 @@ Inspect tables:
 docker exec -t delivery-postgres psql -U postgres -d deliverydb -Atc "select table_name from information_schema.tables where table_schema='public' order by table_name;"
 ```
 
+### Reset Database (Clear All Data)
+
+To clear all data and start fresh for testing:
+
+**Windows:**
+```cmd
+reset-db.bat
+```
+*Script will prompt for credentials if not set, and ask for confirmation*
+
+**Linux/Mac:**
+```bash
+./reset-db.sh
+```
+*Script will prompt for credentials if not set, and ask for confirmation*
+
+**Manual SQL:**
+```bash
+psql -U postgres -d deliverydb -f reset-db.sql
+```
+
+The scripts will:
+- ✅ Use existing `DB_USERNAME`/`DB_PASSWORD` environment variables if set
+- ✅ Prompt for credentials if not set (with sensible defaults)
+- ✅ Ask for confirmation before deleting data
+- ✅ Show verification counts after reset
+
 JPA is configured with `spring.jpa.hibernate.ddl-auto=update` for local development.
 
 ## Troubleshooting
