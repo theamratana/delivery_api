@@ -1,8 +1,6 @@
 package com.delivery.deliveryapi.config;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
-@ConfigurationProperties(prefix = "telegram")
+// Legacy placeholder left to avoid breaking imports; no configuration binding here.
 public class TelegramProperties {
     private String botToken;
 

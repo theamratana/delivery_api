@@ -3,6 +3,8 @@ package com.delivery.deliveryapi.controller;
 import com.delivery.deliveryapi.model.AuthIdentity;
 import com.delivery.deliveryapi.model.AuthProvider;
 import com.delivery.deliveryapi.model.User;
+import com.delivery.deliveryapi.model.UserAudit;
+import com.delivery.deliveryapi.repo.UserAuditRepository;
 import com.delivery.deliveryapi.repo.AuthIdentityRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
 import com.delivery.deliveryapi.service.TelegramAuthService;
@@ -25,16 +27,19 @@ public class AuthController {
     private final boolean devTokenEnabled;
     private final UserRepository userRepository;
     private final AuthIdentityRepository identityRepository;
+    private final UserAuditRepository userAuditRepository;
 
     public AuthController(TelegramAuthService telegramAuthService,
                           UserRepository userRepository,
                           AuthIdentityRepository identityRepository,
                           JwtService jwtService,
+                          UserAuditRepository userAuditRepository,
                           @Value("${jwt.dev-enabled:false}") boolean devTokenEnabled) {
         this.telegramAuthService = telegramAuthService;
         this.userRepository = userRepository;
         this.identityRepository = identityRepository;
         this.jwtService = jwtService;
+        this.userAuditRepository = userAuditRepository;
         this.devTokenEnabled = devTokenEnabled;
     }
 
@@ -83,12 +88,24 @@ public class AuthController {
             identity.setDisplayName(displayNameFrom(req));
             identity.setUsername(req.username);
             user = identity.getUser();
+            // Capture old values for audit
+            String oldDisplayName = user.getDisplayName();
+            String oldFirstName = user.getFirstName();
+            String oldLastName = user.getLastName();
+            String oldUsername = user.getUsername();
+            String oldAvatarUrl = user.getAvatarUrl();
             // update user profile details from Telegram
             user.setFirstName(req.firstName);
             user.setLastName(req.lastName);
             user.setUsername(req.username);
             user.setAvatarUrl(req.photoUrl);
             user.setLastLoginAt(OffsetDateTime.now());
+            // Audit changes
+            auditUserChanges(user.getId(), "displayName", oldDisplayName, displayNameFrom(req), "TELEGRAM");
+            auditUserChanges(user.getId(), "firstName", oldFirstName, req.firstName, "TELEGRAM");
+            auditUserChanges(user.getId(), "lastName", oldLastName, req.lastName, "TELEGRAM");
+            auditUserChanges(user.getId(), "username", oldUsername, req.username, "TELEGRAM");
+            auditUserChanges(user.getId(), "avatarUrl", oldAvatarUrl, req.photoUrl, "TELEGRAM");
         } else {
             user = new User();
             user.setDisplayName(displayNameFrom(req));
@@ -119,6 +136,18 @@ public class AuthController {
     );
 
     return ResponseEntity.ok(new AuthResponse(token, user.getId(), display, user.getUsername(), "TELEGRAM"));
+    }
+
+    private void auditUserChanges(UUID userId, String fieldName, String oldValue, String newValue, String source) {
+        if (!Objects.equals(oldValue, newValue)) {
+            UserAudit audit = new UserAudit();
+            audit.setUserId(userId);
+            audit.setFieldName(fieldName);
+            audit.setOldValue(oldValue);
+            audit.setNewValue(newValue);
+            audit.setSource(source);
+            userAuditRepository.save(audit);
+        }
     }
 
     private static String displayNameFrom(TelegramVerifyRequest req) {

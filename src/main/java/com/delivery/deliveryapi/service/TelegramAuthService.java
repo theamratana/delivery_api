@@ -1,6 +1,6 @@
 package com.delivery.deliveryapi.service;
 
-import com.delivery.deliveryapi.config.TelegramProperties;
+import com.delivery.deliveryapi.config.TelegramBotProperties;
 import org.springframework.stereotype.Service;
 
 // Using fully-qualified class names in methods; no need to import
@@ -11,9 +11,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class TelegramAuthService {
-    private final TelegramProperties props;
+    private final TelegramBotProperties props;
 
-    public TelegramAuthService(TelegramProperties props) {
+    public TelegramAuthService(TelegramBotProperties props) {
         this.props = props;
     }
 

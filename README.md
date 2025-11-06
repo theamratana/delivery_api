@@ -74,7 +74,9 @@ Environment variables (with defaults):
 - DB_USERNAME: `postgres`
 - DB_PASSWORD: `postgres`
 - SERVER_PORT: `8081` (script forces 8081)
-- TELEGRAM_BOT_TOKEN: required for Telegram login signature verification
+- TELEGRAM_BOT_TOKEN: required for Telegram login signature verification and OTP bot messaging
+- TELEGRAM_BOT_USERNAME: patience_delivery_bot (default) — your bot's username without @
+- TELEGRAM_POLLING_ENABLED: true (dev only; enables polling for Telegram updates)
 - JWT_SECRET: `dev-secret-change` (plain text or base64; we derive a strong HS256 key)
 - JWT_ISSUER: `delivery-api`
 - JWT_EXP_MINUTES: `10080` (7 days)
@@ -96,6 +98,72 @@ Validate requests with:
 ```
 Authorization: Bearer <token>
 ```
+
+**Audit Trail**: User profile updates from Telegram login are logged in the `user_audits` table, tracking changes to `displayName`, `firstName`, `lastName`, `username`, `avatarUrl`.
+
+### Telegram OTP (phone verification)
+
+This flow lets a user enter a phone number on your site, then receive a 6‑digit OTP via your Telegram bot after verifying their phone ownership. The OTP verifies that the user has access to the entered phone number.
+
+Requirements:
+- Set `TELEGRAM_BOT_TOKEN` (from BotFather).
+- Ensure your bot username is set (default `patience_delivery_bot` or set `TELEGRAM_BOT_USERNAME`).
+- For local/dev, leave `TELEGRAM_POLLING_ENABLED=true` so the server polls Telegram for updates.
+
+Flow:
+1) Create an OTP attempt
+
+```bash
+curl -s -X POST http://localhost:8081/auth/otp/request \
+  -H 'Content-Type: application/json' \
+  -d '{"phone_e164":"+12025550123"}'
+```
+
+Response (new user, requires phone verification):
+
+```json
+{
+  "attemptId": "<uuid>",
+  "deepLink": "https://t.me/<your_bot_username>?start=link_<code>",
+  "expiresAt": "2025-01-01T12:00:00Z",
+  "sentDirectly": false
+}
+```
+
+Response (existing user, OTP sent directly):
+
+```json
+{
+  "attemptId": "<uuid>",
+  "deepLink": null,
+  "expiresAt": "2025-01-01T12:00:00Z",
+  "sentDirectly": true
+}
+```
+
+2) For new users: Have the user tap the `deepLink` in Telegram. This will open your bot and send `/start link_<code>` to the backend. The bot will ask the user to share their phone number. If the shared phone matches the entered phone, the bot sends a 6‑digit OTP.
+
+For existing users: The OTP is sent directly to their linked Telegram chat.
+
+3) Verify the OTP
+
+```bash
+curl -s -X POST http://localhost:8081/auth/otp/verify \
+  -H 'Content-Type: application/json' \
+  -d '{"attemptId":"<uuid>","code":"<6digits>"}'
+```
+
+Response:
+
+```json
+{ "token": "<jwt>", "userId": "<uuid>" }
+```
+
+Notes:
+- The bot can only message users who have started the bot at least once; the deep link ensures this is satisfied.
+- For new users, phone verification is done by requiring the user to share their contact in Telegram, ensuring the phone matches.
+- OTP attempts expire in a few minutes; verification will fail if expired or too many attempts are made.
+- In dev, if `TELEGRAM_BOT_TOKEN` is not set, OTP messages cannot be sent. Set the token or disable polling with `TELEGRAM_POLLING_ENABLED=false`.
 
 ### Test Telegram login with your current session
 
@@ -123,6 +191,8 @@ Notes:
   - POST `/auth/telegram/verify` → returns `{ token, userId, displayName, username, provider }`
   - GET `/auth/dev/token/{userId}` → returns `{ token, userId }` for an existing user (dev only). 404 if the userId doesn’t exist.
   - POST `/auth/dev/token/new` → creates a dev user and returns `{ token, userId, username }` (dev only).
+  - POST `/auth/otp/request` → body `{ "phone_e164": "+12025550123" }` returns `{ attemptId, deepLink, expiresAt }`
+  - POST `/auth/otp/verify` → body `{ "attemptId": "<uuid>", "code": "123456" }` returns `{ token, userId }`
 
 - Users (phones; JWT required)
   - GET `/users/{userId}/phones` → list phones

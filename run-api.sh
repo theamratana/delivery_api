@@ -30,6 +30,13 @@ kill_by_pid() {
 
 kill_on_port() {
 	local p="$1"
+	if [ -f .pid_api ]; then
+		local pid=$(cat .pid_api)
+		if [ -n "$pid" ]; then
+			kill_by_pid "$pid" || true
+			rm -f .pid_api
+		fi
+	fi
 	if command -v netstat >/dev/null 2>&1; then
 		# Get unique PIDs listening on the port
 		local pids
@@ -83,9 +90,11 @@ case "$cmd" in
 		fi
 			echo "Starting API on port ${SERVER_PORT}..."
 			if [ -x "./gradlew" ]; then
-				exec ./gradlew bootRun
+				./gradlew bootRun &
+				echo $! > .pid_api
 			else
-				exec ./gradle-8.5/bin/gradle bootRun
+				./gradle-8.5/bin/gradle bootRun &
+				echo $! > .pid_api
 			fi
 		;;
 esac
