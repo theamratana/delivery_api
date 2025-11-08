@@ -115,13 +115,347 @@ The User Account module provides comprehensive user management, authentication, 
 - Authentication identities
 - Company invitations
 
-## API Endpoints
-- `POST /auth/login`: Telegram authentication
-- `POST /auth/verify`: OTP verification
-- `GET /users/profile`: User profile retrieval
-- `PUT /users/profile`: Profile updates
-- `POST /companies/{id}/employees`: Add employees
-- `GET /companies/{id}/employees`: List employees
+## API Documentation
+
+### Enums
+
+#### UserType
+```json
+{
+  "CUSTOMER": "End customer placing orders",
+  "DRIVER": "Delivery driver",
+  "COMPANY": "Company representative",
+  "DELIVERY_COMPANY": "Delivery company admin",
+  "STORE_OWNER": "Store/restaurant owner",
+  "ADMIN": "System administrator"
+}
+```
+
+#### UserRole
+```json
+{
+  "OWNER": "Company creator with full access",
+  "MANAGER": "Can manage team and orders",
+  "STAFF": "Customer service and basic operations",
+  "DRIVER": "Delivery personnel"
+}
+```
+
+#### AuthProvider
+```json
+{
+  "TELEGRAM": "Telegram bot authentication",
+  "PHONE": "Phone number authentication",
+  "GOOGLE": "Google OAuth",
+  "FACEBOOK": "Facebook OAuth",
+  "TIKTOK": "TikTok OAuth"
+}
+```
+
+### Authentication Endpoints
+
+#### POST /auth/telegram/verify
+Telegram authentication verification.
+
+**Request Body:**
+```json
+{
+  "id": "123456789",
+  "first_name": "John",
+  "last_name": "Doe",
+  "username": "johndoe",
+  "photo_url": "https://example.com/photo.jpg",
+  "auth_date": "1640995200",
+  "hash": "abc123def456"
+}
+```
+
+**Response (200):**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "displayName": "John Doe",
+  "username": "johndoe",
+  "provider": "TELEGRAM"
+}
+```
+
+**Error Responses:**
+- `401`: `{"error": "invalid_signature"}`
+
+#### GET /auth/profile
+Get current user profile.
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Response (200):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "displayName": "John Doe",
+  "username": "johndoe",
+  "firstName": "John",
+  "lastName": "Doe",
+  "userType": "CUSTOMER",
+  "userRole": "OWNER",
+  "companyId": "550e8400-e29b-41d4-a716-446655440001",
+  "companyName": "Acme Delivery",
+  "incomplete": false
+}
+```
+
+#### PUT /auth/profile
+Update user profile.
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Request Body:**
+```json
+{
+  "userType": "DRIVER",
+  "firstName": "John",
+  "lastName": "Smith",
+  "displayName": "John Smith",
+  "companyName": "New Company Inc"
+}
+```
+
+**Response (200):**
+```json
+{
+  "message": "Profile updated successfully"
+}
+```
+
+#### GET /auth/dev/token/{userId}
+Get development token for testing (only when dev mode enabled).
+
+**Response (200):**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "userId": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+### OTP Endpoints
+
+#### POST /auth/otp/request
+Request OTP verification code.
+
+**Request Body:**
+```json
+{
+  "phone_e164": "+1234567890"
+}
+```
+
+**Response (200):**
+```json
+{
+  "attemptId": "550e8400-e29b-41d4-a716-446655440000",
+  "deepLink": "https://t.me/bot_username?start=otp_550e8400-e29b-41d4-a716-446655440000",
+  "expiresAt": "2024-01-01T12:00:00Z",
+  "sentDirectly": false
+}
+```
+
+#### POST /auth/otp/verify
+Verify OTP code.
+
+**Request Body:**
+```json
+{
+  "attemptId": "550e8400-e29b-41d4-a716-446655440000",
+  "code": "123456"
+}
+```
+
+**Response (200):**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "displayName": "John Doe",
+  "username": "johndoe",
+  "provider": "TELEGRAM-OTP"
+}
+```
+
+**Error Responses:**
+- `400`: `{"error": "Invalid or expired verification code"}`
+- `409`: `{"error": "Phone number already registered or constraint violation"}`
+
+### Company Management Endpoints
+
+#### POST /auth/companies/{companyId}/add-employee
+Add employee to company (requires OWNER or MANAGER role).
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Request Body:**
+```json
+{
+  "role": "DRIVER",
+  "phoneNumber": "+1234567890"
+}
+```
+
+**Response (200):**
+```json
+{
+  "message": "Employee invitation created successfully",
+  "phoneNumber": "+1234567890",
+  "role": "DRIVER",
+  "expiresAt": "2024-01-08T12:00:00Z"
+}
+```
+
+**Error Responses:**
+- `400`: `{"error": "An employee invitation already exists for this phone number"}`
+- `403`: `{"error": "Insufficient permissions to add employee"}`
+
+#### GET /auth/companies/{companyId}/employees
+Get company employees (requires OWNER or MANAGER role).
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Response (200):**
+```json
+{
+  "employees": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "displayName": "John Doe",
+      "firstName": "John",
+      "lastName": "Doe",
+      "phoneNumber": "+1234567890",
+      "role": "OWNER",
+      "status": "ACTIVE",
+      "invitedAt": null,
+      "joinedAt": "2024-01-01T10:00:00Z"
+    },
+    {
+      "id": null,
+      "displayName": null,
+      "firstName": null,
+      "lastName": null,
+      "phoneNumber": "+1987654321",
+      "role": "DRIVER",
+      "status": "PENDING",
+      "invitedAt": "2024-01-01T11:00:00Z",
+      "joinedAt": null
+    }
+  ],
+  "totalCount": 2
+}
+```
+
+#### POST /auth/leave-company
+Leave current company.
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Response (200):**
+```json
+{
+  "message": "Successfully left company"
+}
+```
+
+### User Phone Management Endpoints
+
+#### GET /users/{userId}/phones
+List user's phone numbers.
+
+**Response (200):**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "userId": "550e8400-e29b-41d4-a716-446655440001",
+    "phoneE164": "+1234567890",
+    "primary": true,
+    "verified": true,
+    "createdAt": "2024-01-01T10:00:00Z"
+  }
+]
+```
+
+#### POST /users/{userId}/phones
+Add phone number to user.
+
+**Request Body:**
+```json
+{
+  "phoneE164": "+1234567890",
+  "primary": true
+}
+```
+
+**Response (200):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "userId": "550e8400-e29b-41d4-a716-446655440001",
+  "phoneE164": "+1234567890",
+  "primary": true,
+  "verified": false,
+  "createdAt": "2024-01-01T10:00:00Z"
+}
+```
+
+#### PATCH /users/{userId}/phones/{phoneId}/primary
+Set phone number as primary.
+
+**Response (200):**
+```json
+{
+  "status": "ok"
+}
+```
+
+### Health Check Endpoints
+
+#### GET /api/ping
+Basic health check.
+
+**Response (200):**
+```json
+{
+  "status": "ok",
+  "message": "pong",
+  "time": "2024-01-01T12:00:00+00:00"
+}
+```
+
+#### GET /api/db/ping
+Database health check.
+
+**Response (200):**
+```json
+{
+  "status": "ok",
+  "db": 1,
+  "time": "2024-01-01T12:00:00+00:00"
+}
+```
 
 ## Testing
 - Unit tests for services and utilities
