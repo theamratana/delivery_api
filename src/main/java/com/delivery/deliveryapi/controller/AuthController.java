@@ -236,6 +236,16 @@ public class AuthController {
             user.setUsername("testuser-" + userId.toString().substring(0, 8));
             user.setDisplayName("Test User");
             user.setLastLoginAt(OffsetDateTime.now());
+            
+            // Create or find a default test company
+            Company testCompany = companyRepository.findByName("Test Company").orElse(null);
+            if (testCompany == null) {
+                testCompany = new Company();
+                testCompany.setName("Test Company");
+                testCompany = companyRepository.save(testCompany);
+            }
+            user.setCompany(testCompany);
+            
             user = userRepository.save(user);
             // Return the actual generated ID
             return ResponseEntity.ok(Map.of(
