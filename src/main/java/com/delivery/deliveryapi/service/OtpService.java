@@ -10,6 +10,7 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,7 +22,6 @@ import com.delivery.deliveryapi.model.User;
 import com.delivery.deliveryapi.repo.AuthIdentityRepository;
 import com.delivery.deliveryapi.repo.OtpAttemptRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
-import com.delivery.deliveryapi.service.CompanyAssignmentService;
 
 @Service
 public class OtpService {
@@ -87,12 +87,21 @@ public class OtpService {
             String msg = (name.isBlank() ? "" : (name + ", ")) +
                     "your verification code is: " + codeStr + "\n" +
                     "This code expires in " + CODE_TTL.toMinutes() + " minutes.";
-            tg.sendMessage(chatId, msg);
+            sendOtpMessageAsync(chatId, msg);
             sentDirectly = true;
         }
 
         String deepLink = sentDirectly ? null : "https://t.me/" + botUsername + "?start=link_" + a.getLinkCode();
         return new OtpRequestResult(a.getId(), deepLink, a.getExpiresAt(), sentDirectly);
+    }
+
+    @Async
+    public void sendOtpMessageAsync(Long chatId, String message) {
+        try {
+            tg.sendMessage(chatId, message);
+        } catch (Exception e) {
+            log.error("Failed to send OTP message to chatId: {}", chatId, e);
+        }
     }
 
     @Transactional
@@ -127,7 +136,7 @@ public class OtpService {
             String msg = (name.isBlank() ? "" : (name + ", ")) +
                     "your verification code is: " + codeStr + "\n" +
                     "This code expires in " + CODE_TTL.toMinutes() + " minutes.";
-            tg.sendMessage(chatId, msg);
+            sendOtpMessageAsync(chatId, msg);
             return Optional.of(a.getId());
         } else {
             // Request contact to verify phone
@@ -205,7 +214,7 @@ public class OtpService {
         Optional<OtpAttempt> opt = attempts.findTopByChatIdAndStatusOrderByCreatedAtDesc(chatId, OtpStatus.WAITING_FOR_CONTACT);
         if (opt.isEmpty()) {
             log.warn("No attempt found for chatId: {}", chatId);
-            tg.sendMessage(chatId, "No pending verification request found.");
+            sendOtpMessageAsync(chatId, "No pending verification request found.");
             return;
         }
         OtpAttempt a = opt.get();
@@ -214,7 +223,7 @@ public class OtpService {
         if (!normalizedPhone.equals(a.getPhoneE164())) {
             a.setStatus(OtpStatus.BLOCKED);
             attempts.save(a);
-            tg.sendMessage(chatId, "The shared phone number does not match the one you entered. Verification failed.");
+            sendOtpMessageAsync(chatId, "The shared phone number does not match the one you entered. Verification failed.");
             return;
         }
 
@@ -229,7 +238,7 @@ public class OtpService {
 
         String msg = "Your verification code is: " + codeStr + "\n" +
                 "This code expires in " + CODE_TTL.toMinutes() + " minutes.";
-        tg.sendMessage(chatId, msg);
+        sendOtpMessageAsync(chatId, msg);
     }
 
     public static String normalizePhone(String phone) {

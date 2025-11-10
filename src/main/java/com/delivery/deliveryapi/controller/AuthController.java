@@ -276,6 +276,17 @@ public class AuthController {
             user.setUsername("devuser-" + userId.toString().replace("-", ""));
             user.setDisplayName("Dev User");
             user.setLastLoginAt(OffsetDateTime.now());
+            
+            // Create or find a default test company for dev users
+            Company testCompany = companyRepository.findByName("Test Company").orElse(null);
+            if (testCompany == null) {
+                testCompany = new Company();
+                testCompany.setName("Test Company");
+                testCompany = companyRepository.save(testCompany);
+            }
+            user.setCompany(testCompany);
+            user.setUserRole(UserRole.OWNER); // Make dev users owners of the test company
+            
             user = userRepository.save(user);
         }
 
