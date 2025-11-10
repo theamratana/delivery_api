@@ -31,15 +31,18 @@ public class DeliveryService {
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
     private final DeliveryPhotoRepository deliveryPhotoRepository;
+    private final DeliveryPricingService deliveryPricingService;
 
     public DeliveryService(DeliveryItemRepository deliveryItemRepository,
                           UserRepository userRepository,
                           CompanyRepository companyRepository,
-                          DeliveryPhotoRepository deliveryPhotoRepository) {
+                          DeliveryPhotoRepository deliveryPhotoRepository,
+                          DeliveryPricingService deliveryPricingService) {
         this.deliveryItemRepository = deliveryItemRepository;
         this.userRepository = userRepository;
         this.companyRepository = companyRepository;
         this.deliveryPhotoRepository = deliveryPhotoRepository;
+        this.deliveryPricingService = deliveryPricingService;
     }
 
     @Transactional
@@ -65,8 +68,8 @@ public class DeliveryService {
             log.info("Using delivery driver: {} ({})", deliveryDriver.getId(), deliveryDriver.getPhoneE164());
         }
 
-        // Calculate delivery fee (simplified for now)
-        BigDecimal deliveryFee = calculateDeliveryFee(request);
+        // Calculate delivery fee using user's pricing rules
+        BigDecimal deliveryFee = deliveryPricingService.calculateDeliveryFee(sender, request);
 
         // Create delivery item
         DeliveryItem delivery = new DeliveryItem();
@@ -76,7 +79,11 @@ public class DeliveryService {
         delivery.setDeliveryDriver(deliveryDriver);
         delivery.setItemDescription(request.getItemDescription());
         delivery.setPickupAddress(request.getPickupAddress());
+        delivery.setPickupProvince(request.getPickupProvince());
+        delivery.setPickupDistrict(request.getPickupDistrict());
         delivery.setDeliveryAddress(request.getDeliveryAddress());
+        delivery.setDeliveryProvince(request.getDeliveryProvince());
+        delivery.setDeliveryDistrict(request.getDeliveryDistrict());
         delivery.setItemValue(request.getEstimatedValue());
         delivery.setDeliveryFee(deliveryFee);
         delivery.setEstimatedDeliveryTime(OffsetDateTime.now().plusHours(2)); // Default 2 hours
@@ -97,6 +104,11 @@ public class DeliveryService {
     }
 
     private void validateCreateDeliveryRequest(CreateDeliveryRequest request) {
+        validateRequiredFields(request);
+        validateDeliveryType(request);
+    }
+
+    private void validateRequiredFields(CreateDeliveryRequest request) {
         if (request.getReceiverPhone() == null || request.getReceiverPhone().trim().isEmpty()) {
             throw new IllegalArgumentException("Receiver phone is required");
         }
@@ -106,10 +118,24 @@ public class DeliveryService {
         if (request.getPickupAddress() == null || request.getPickupAddress().trim().isEmpty()) {
             throw new IllegalArgumentException("Pickup address is required");
         }
+        if (request.getPickupProvince() == null || request.getPickupProvince().trim().isEmpty()) {
+            throw new IllegalArgumentException("Pickup province is required");
+        }
+        if (request.getPickupDistrict() == null || request.getPickupDistrict().trim().isEmpty()) {
+            throw new IllegalArgumentException("Pickup district is required");
+        }
         if (request.getDeliveryAddress() == null || request.getDeliveryAddress().trim().isEmpty()) {
             throw new IllegalArgumentException("Delivery address is required");
         }
+        if (request.getDeliveryProvince() == null || request.getDeliveryProvince().trim().isEmpty()) {
+            throw new IllegalArgumentException("Delivery province is required");
+        }
+        if (request.getDeliveryDistrict() == null || request.getDeliveryDistrict().trim().isEmpty()) {
+            throw new IllegalArgumentException("Delivery district is required");
+        }
+    }
 
+    private void validateDeliveryType(CreateDeliveryRequest request) {
         String deliveryType = request.getDeliveryType();
         if (!DELIVERY_TYPE_COMPANY.equalsIgnoreCase(deliveryType) &&
             !DELIVERY_TYPE_DRIVER.equalsIgnoreCase(deliveryType)) {
@@ -185,19 +211,6 @@ public class DeliveryService {
         driver.setActive(true);
 
         return userRepository.save(driver);
-    }
-
-    private BigDecimal calculateDeliveryFee(CreateDeliveryRequest request) {
-        // Simplified fee calculation - in a real implementation this would be more complex
-        // Based on distance, weight, urgency, etc.
-        BigDecimal baseFee = BigDecimal.valueOf(2.00); // $2 base fee
-
-        // Add surcharge for high-value items
-        if (request.getEstimatedValue() != null && request.getEstimatedValue().compareTo(BigDecimal.valueOf(100)) > 0) {
-            baseFee = baseFee.add(BigDecimal.valueOf(1.00));
-        }
-
-        return baseFee;
     }
 
     private String normalizePhone(String phone) {

@@ -22,26 +22,30 @@ import com.delivery.deliveryapi.model.User;
 import com.delivery.deliveryapi.repo.DeliveryItemRepository;
 import com.delivery.deliveryapi.repo.DeliveryPhotoRepository;
 import com.delivery.deliveryapi.repo.DeliveryTrackingRepository;
+import com.delivery.deliveryapi.repo.UserRepository;
 import com.delivery.deliveryapi.service.DeliveryService;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 @RestController
-@RequestMapping("/api/deliveries")
+@RequestMapping("/deliveries")
 public class DeliveryController {
 
     private final DeliveryService deliveryService;
     private final DeliveryItemRepository deliveryItemRepository;
     private final DeliveryTrackingRepository deliveryTrackingRepository;
     private final DeliveryPhotoRepository deliveryPhotoRepository;
+    private final UserRepository userRepository;
 
     public DeliveryController(DeliveryService deliveryService,
                             DeliveryItemRepository deliveryItemRepository,
                             DeliveryTrackingRepository deliveryTrackingRepository,
-                            DeliveryPhotoRepository deliveryPhotoRepository) {
+                            DeliveryPhotoRepository deliveryPhotoRepository,
+                            UserRepository userRepository) {
         this.deliveryService = deliveryService;
         this.deliveryItemRepository = deliveryItemRepository;
         this.deliveryTrackingRepository = deliveryTrackingRepository;
         this.deliveryPhotoRepository = deliveryPhotoRepository;
+        this.userRepository = userRepository;
     }
 
     @PostMapping
@@ -49,7 +53,21 @@ public class DeliveryController {
     public ResponseEntity<DeliveryResponse> createDelivery(@RequestBody CreateDeliveryRequest request) {
         try {
             // Get current user from security context
-            User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            var auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            UUID userId;
+            try {
+                userId = UUID.fromString(userIdStr);
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            var optUser = userRepository.findById(userId);
+            if (optUser.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            User currentUser = optUser.get();
 
             // Create the delivery
             DeliveryItem delivery = deliveryService.createDelivery(currentUser, request);
@@ -75,7 +93,21 @@ public class DeliveryController {
 
     @GetMapping
     public ResponseEntity<List<DeliveryItem>> getUserDeliveries() {
-        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID userId;
+        try {
+            userId = UUID.fromString(userIdStr);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        var optUser = userRepository.findById(userId);
+        if (optUser.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        User currentUser = optUser.get();
         List<DeliveryItem> deliveries = deliveryItemRepository.findByUserInvolved(currentUser);
         return ResponseEntity.ok(deliveries);
     }
@@ -117,8 +149,26 @@ public class DeliveryController {
         @JsonProperty("pickupAddress")
         private String pickupAddress;
 
+        @JsonProperty("pickupProvince")
+        private String pickupProvince;
+
+        @JsonProperty("pickupDistrict")
+        private String pickupDistrict;
+
         @JsonProperty("deliveryAddress")
         private String deliveryAddress;
+
+        @JsonProperty("deliveryProvince")
+        private String deliveryProvince;
+
+        @JsonProperty("deliveryDistrict")
+        private String deliveryDistrict;
+
+        @JsonProperty("deliveryFee")
+        private BigDecimal deliveryFee;
+
+        @JsonProperty("deliveryFeeModel")
+        private String deliveryFeeModel;
 
         @JsonProperty("estimatedValue")
         private BigDecimal estimatedValue;
@@ -154,8 +204,26 @@ public class DeliveryController {
         public String getPickupAddress() { return pickupAddress; }
         public void setPickupAddress(String pickupAddress) { this.pickupAddress = pickupAddress; }
 
+        public String getPickupProvince() { return pickupProvince; }
+        public void setPickupProvince(String pickupProvince) { this.pickupProvince = pickupProvince; }
+
+        public String getPickupDistrict() { return pickupDistrict; }
+        public void setPickupDistrict(String pickupDistrict) { this.pickupDistrict = pickupDistrict; }
+
         public String getDeliveryAddress() { return deliveryAddress; }
         public void setDeliveryAddress(String deliveryAddress) { this.deliveryAddress = deliveryAddress; }
+
+        public String getDeliveryProvince() { return deliveryProvince; }
+        public void setDeliveryProvince(String deliveryProvince) { this.deliveryProvince = deliveryProvince; }
+
+        public String getDeliveryDistrict() { return deliveryDistrict; }
+        public void setDeliveryDistrict(String deliveryDistrict) { this.deliveryDistrict = deliveryDistrict; }
+
+        public BigDecimal getDeliveryFee() { return deliveryFee; }
+        public void setDeliveryFee(BigDecimal deliveryFee) { this.deliveryFee = deliveryFee; }
+
+        public String getDeliveryFeeModel() { return deliveryFeeModel; }
+        public void setDeliveryFeeModel(String deliveryFeeModel) { this.deliveryFeeModel = deliveryFeeModel; }
 
         public BigDecimal getEstimatedValue() { return estimatedValue; }
         public void setEstimatedValue(BigDecimal estimatedValue) { this.estimatedValue = estimatedValue; }

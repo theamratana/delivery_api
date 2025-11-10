@@ -63,8 +63,20 @@ public class DeliveryItem extends AuditableEntity {
     @Column(name = "pickup_address", columnDefinition = "TEXT")
     private String pickupAddress;
 
+    @Column(name = "pickup_province")
+    private String pickupProvince;
+
+    @Column(name = "pickup_district")
+    private String pickupDistrict;
+
     @Column(name = "delivery_address", columnDefinition = "TEXT")
     private String deliveryAddress;
+
+    @Column(name = "delivery_province")
+    private String deliveryProvince;
+
+    @Column(name = "delivery_district")
+    private String deliveryDistrict;
 
     @Column(name = "pickup_lat", precision = 10, scale = 8)
     private BigDecimal pickupLat;
@@ -125,8 +137,20 @@ public class DeliveryItem extends AuditableEntity {
     public String getPickupAddress() { return pickupAddress; }
     public void setPickupAddress(String pickupAddress) { this.pickupAddress = pickupAddress; }
 
+    public String getPickupProvince() { return pickupProvince; }
+    public void setPickupProvince(String pickupProvince) { this.pickupProvince = pickupProvince; }
+
+    public String getPickupDistrict() { return pickupDistrict; }
+    public void setPickupDistrict(String pickupDistrict) { this.pickupDistrict = pickupDistrict; }
+
     public String getDeliveryAddress() { return deliveryAddress; }
     public void setDeliveryAddress(String deliveryAddress) { this.deliveryAddress = deliveryAddress; }
+
+    public String getDeliveryProvince() { return deliveryProvince; }
+    public void setDeliveryProvince(String deliveryProvince) { this.deliveryProvince = deliveryProvince; }
+
+    public String getDeliveryDistrict() { return deliveryDistrict; }
+    public void setDeliveryDistrict(String deliveryDistrict) { this.deliveryDistrict = deliveryDistrict; }
 
     public BigDecimal getPickupLat() { return pickupLat; }
     public void setPickupLat(BigDecimal pickupLat) { this.pickupLat = pickupLat; }
