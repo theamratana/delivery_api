@@ -122,9 +122,9 @@ case "$cmd" in
 		echo "🚀 Starting API server on port ${SERVER_PORT}..."
 		# Choose a launch mechanism that survives shell exit if available
 		if [ -x "./gradlew" ]; then
-			LAUNCH_CMD=("./gradlew" "bootRun")
+			LAUNCH_CMD=("./gradlew" "bootRun" "-Dspring.profiles.active=production")
 		else
-			LAUNCH_CMD=("./gradle-8.5/bin/gradle" "bootRun")
+			LAUNCH_CMD=("./gradle-8.5/bin/gradle" "bootRun" "-Dspring.profiles.active=production")
 		fi
 		# redirect logs to .api.log for easy inspection
 		if command -v nohup >/dev/null 2>&1; then

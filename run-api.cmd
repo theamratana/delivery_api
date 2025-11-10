@@ -59,9 +59,9 @@ if %ERRORLEVEL%==0 (
 
 echo 🚀 Starting API server on port %SERVER_PORT%...
 if exist gradlew.bat (
-    start /B gradlew.bat bootRun
+    start /B gradlew.bat bootRun -Dspring.profiles.active=production
 ) else (
-    start /B gradle-8.5\bin\gradle.bat bootRun
+    start /B gradle-8.5\bin\gradle.bat bootRun -Dspring.profiles.active=production
 )
 echo ✅ API server started.
 goto :eof
