@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,8 +21,10 @@ public interface ProvinceRepository extends JpaRepository<Province, UUID> {
 
     List<Province> findByActiveTrue();
 
+    @Cacheable("provinces")
     List<Province> findByActiveTrueOrderByName();
 
+    @Cacheable("provinces")
     @Query("SELECT p FROM Province p WHERE p.active = true ORDER BY p.name")
     List<Province> findAllActiveProvinces();
 

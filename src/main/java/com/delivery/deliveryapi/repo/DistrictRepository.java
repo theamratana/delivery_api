@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -27,14 +28,18 @@ public interface DistrictRepository extends JpaRepository<District, UUID> {
 
     List<District> findByActiveTrue();
 
+    @Cacheable("districts")
     List<District> findByActiveTrueOrderByName();
 
+    @Cacheable(value = "districts", key = "#province.id")
     @Query("SELECT d FROM District d WHERE d.province = :province AND d.active = true ORDER BY d.name")
     List<District> findActiveDistrictsByProvince(@Param("province") Province province);
 
+    @Cacheable(value = "districts", key = "#provinceId")
     @Query("SELECT d FROM District d WHERE d.province.id = :provinceId AND d.active = true ORDER BY d.name")
     List<District> findActiveDistrictsByProvinceId(@Param("provinceId") UUID provinceId);
 
+    @Cacheable(value = "districts", key = "#provinceCode")
     @Query("SELECT d FROM District d WHERE d.province.code = :provinceCode AND d.active = true ORDER BY d.name")
     List<District> findActiveDistrictsByProvinceCode(@Param("provinceCode") String provinceCode);
 
