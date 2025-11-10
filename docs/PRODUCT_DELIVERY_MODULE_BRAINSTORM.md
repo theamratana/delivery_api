@@ -714,11 +714,11 @@ CREATE TABLE payment_installments (
 - `GET /api/wallets/seller/balance` - Check seller wallet balance
 
 #### Delivery Fee API Endpoints
-- `POST /api/deliveries/{id}/calculate-fee` - Calculate delivery fee
-- `POST /api/deliveries/{id}/pay-delivery-fee` - Pay delivery fee
-- `GET /api/deliveries/{id}/fee-status` - Check delivery fee payment status
-- `POST /api/deliveries/{id}/subsidize-fee` - Sender subsidizes delivery fee
-- `GET /api/analytics/delivery-fees` - Delivery fee analytics
+- `POST /deliveries/{id}/calculate-fee` - Calculate delivery fee
+- `POST /deliveries/{id}/pay-delivery-fee` - Pay delivery fee
+- `GET /deliveries/{id}/fee-status` - Check delivery fee payment status
+- `POST /deliveries/{id}/subsidize-fee` - Sender subsidizes delivery fee
+- `GET /analytics/delivery-fees` - Delivery fee analytics
 
 ### Challenges & Solutions - COMMERCIAL PAYMENTS
 
@@ -876,7 +876,7 @@ Total Amount Receiver Pays = $12.00
 
 #### API Request Structure
 ```json
-POST /api/deliveries
+POST /deliveries
 {
   "item": {
     "description": "iPhone 15 Pro",
@@ -898,7 +898,12 @@ POST /api/deliveries
     "name": "John Doe",
     "address": "123 Street, Phnom Penh",
     "province": "Phnom Penh",
-    "khanDistrict": "Chamkarmon"
+    "district": "Chamkarmon"
+  },
+  "pickup": {
+    "address": "456 Sender St, Phnom Penh",
+    "province": "Phnom Penh",
+    "district": "Daun Penh"
   },
   "delivery": {
     "method": "COMPANY",
@@ -976,7 +981,7 @@ This process creates a seamless experience where senders can easily set up deliv
 
 ### Delivery Item Management
 
-#### POST /api/deliveries
+#### POST /deliveries
 Create new delivery item
 
 **Request:**
@@ -991,23 +996,29 @@ Create new delivery item
   "itemDescription": "Electronics package",
   "itemPhotos": ["photo1.jpg", "photo2.jpg"],
   "pickupAddress": "123 Sender St, City, State",
+  "pickupProvince": "Phnom Penh",
+  "pickupDistrict": "Daun Penh",
   "deliveryAddress": "456 Receiver Ave, City, State",
+  "deliveryProvince": "Phnom Penh",
+  "deliveryDistrict": "Chamkarmon",
   "estimatedValue": 299.99,
+  "deliveryFee": 3.50, // Optional: Custom delivery fee
+  "deliveryFeeModel": "STANDARD", // Optional: "STANDARD", "CUSTOM", "FREE"
   "specialInstructions": "Handle with care"
 }
 ```
 
-#### GET /api/deliveries
+#### GET /deliveries
 List user's deliveries (as sender)
 
 **Query Parameters:**
 - `status`: Filter by status
 - `page`, `size`: Pagination
 
-#### GET /api/deliveries/{id}
+#### GET /deliveries/{id}
 Get delivery details
 
-#### PUT /api/deliveries/{id}/status
+#### PUT /deliveries/{id}/status
 Update delivery status (for drivers/companies)
 
 **Request:**
@@ -1155,7 +1166,11 @@ CREATE TABLE delivery_items (
     is_deleted BOOLEAN DEFAULT FALSE,
     estimated_delivery_time TIMESTAMP WITH TIME ZONE,
     pickup_address TEXT,
+    pickup_province VARCHAR(100),
+    pickup_district VARCHAR(100),
     delivery_address TEXT,
+    delivery_province VARCHAR(100),
+    delivery_district VARCHAR(100),
     pickup_lat DECIMAL, pickup_lng DECIMAL,
     delivery_lat DECIMAL, delivery_lng DECIMAL,
     delivery_fee DECIMAL(10,2),

@@ -262,6 +262,36 @@ The scripts will:
 - ✅ Ask for confirmation before deleting data
 - ✅ Show verification counts after reset
 
+### Targeted Database Reset (Preserve Working Data)
+
+For development troubleshooting, reset only specific modules while preserving working features:
+
+**✅ INTERACTIVE MENU SYSTEM:** Choose modules with numbered options instead of editing code!
+
+**How to Use:**
+1. Run `./reset-db.sh` (Linux/Mac) or `reset-db.bat` (Windows)
+2. Select module numbers (e.g., "1 3 5" for multiple modules)
+3. Option 0 for full reset (CAUTION!)
+4. Confirm and the script generates/executes the appropriate SQL
+
+**Interactive Menu Options:**
+```
+0) FULL RESET - Delete ALL data (CAUTION!)
+1) AUTHENTICATION MODULE - OTP, Telegram, JWT data
+2) USER MANAGEMENT MODULE - Profiles, audit trails
+3) COMPANY MANAGEMENT MODULE - Companies, employees
+4) PRICING MODULE - Delivery pricing rules
+5) DELIVERY PACKAGE MODULE - Package tracking (future)
+```
+
+**Example Usage:**
+- Reset only pricing rules: Enter `4`
+- Reset auth + pricing: Enter `1 4`
+- Full reset: Enter `0`
+- Cancel: Enter `q`
+
+**Verification:** The script shows PRESERVED vs CLEARED status for each table after reset.
+
 JPA is configured with `spring.jpa.hibernate.ddl-auto=update` for local development.
 
 ## Troubleshooting
