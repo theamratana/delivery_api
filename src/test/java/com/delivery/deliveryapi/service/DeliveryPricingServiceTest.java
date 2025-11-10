@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.delivery.deliveryapi.controller.DeliveryController.CreateDeliveryRequest;
 import com.delivery.deliveryapi.model.DeliveryPricingRule;
+import com.delivery.deliveryapi.model.Company;
 import com.delivery.deliveryapi.model.User;
 import com.delivery.deliveryapi.repo.DeliveryPricingRuleRepository;
 
@@ -37,17 +38,28 @@ class DeliveryPricingServiceTest {
     private DeliveryPricingService pricingService;
 
     private User testUser;
+    private Company testCompany;
     private UUID userId;
+    private UUID companyId;
 
     @BeforeEach
     void setUp() throws Exception {
         userId = UUID.randomUUID();
+        companyId = UUID.randomUUID();
+        
+        testCompany = new Company();
+        Field companyIdField = Company.class.getDeclaredField("id");
+        companyIdField.setAccessible(true);
+        companyIdField.set(testCompany, companyId);
+        testCompany.setName("Test Company");
+        
         testUser = new User();
         // Use reflection to set the ID since it's private
         Field idField = User.class.getDeclaredField("id");
         idField.setAccessible(true);
         idField.set(testUser, userId);
         testUser.setUsername("testuser");
+        testUser.setCompany(testCompany);
     }
 
     @Test
@@ -56,7 +68,7 @@ class DeliveryPricingServiceTest {
         String ruleName = "Test Rule";
         BigDecimal baseFee = BigDecimal.valueOf(2.50);
 
-        DeliveryPricingRule savedRule = new DeliveryPricingRule(testUser, ruleName, baseFee);
+        DeliveryPricingRule savedRule = new DeliveryPricingRule(testCompany, ruleName, baseFee);
         setRuleId(savedRule, UUID.randomUUID());
 
         when(pricingRuleRepository.save(any(DeliveryPricingRule.class))).thenReturn(savedRule);
@@ -68,7 +80,7 @@ class DeliveryPricingServiceTest {
         assertNotNull(result);
         assertEquals(ruleName, result.getRuleName());
         assertEquals(baseFee, result.getBaseFee());
-        assertEquals(testUser, result.getUser());
+        assertEquals(testCompany, result.getCompany());
         verify(pricingRuleRepository).save(any(DeliveryPricingRule.class));
     }
 
@@ -80,7 +92,7 @@ class DeliveryPricingServiceTest {
         String district = "Chamkarmon";
         BigDecimal baseFee = BigDecimal.valueOf(2.00);
 
-        DeliveryPricingRule savedRule = new DeliveryPricingRule(testUser, ruleName, baseFee);
+        DeliveryPricingRule savedRule = new DeliveryPricingRule(testCompany, ruleName, baseFee);
         savedRule.setProvince(province);
         savedRule.setDistrict(district);
         setRuleId(savedRule, UUID.randomUUID());
@@ -106,10 +118,10 @@ class DeliveryPricingServiceTest {
         String newRuleName = "Updated Rule";
         BigDecimal newBaseFee = BigDecimal.valueOf(3.00);
 
-        DeliveryPricingRule existingRule = new DeliveryPricingRule(testUser, "Old Rule", BigDecimal.valueOf(2.00));
+        DeliveryPricingRule existingRule = new DeliveryPricingRule(testCompany, "Old Rule", BigDecimal.valueOf(2.00));
         setRuleId(existingRule, ruleId);
 
-        DeliveryPricingRule updatedRule = new DeliveryPricingRule(testUser, newRuleName, newBaseFee);
+        DeliveryPricingRule updatedRule = new DeliveryPricingRule(testCompany, newRuleName, newBaseFee);
         setRuleId(updatedRule, ruleId);
 
         when(pricingRuleRepository.findById(eq(ruleId))).thenReturn(Optional.of(existingRule));
@@ -141,7 +153,7 @@ class DeliveryPricingServiceTest {
     void testDeletePricingRule() throws Exception {
         // Given
         UUID ruleId = UUID.randomUUID();
-        DeliveryPricingRule rule = new DeliveryPricingRule(testUser, "Test Rule", BigDecimal.ONE);
+        DeliveryPricingRule rule = new DeliveryPricingRule(testCompany, "Test Rule", BigDecimal.ONE);
         setRuleId(rule, ruleId);
 
         when(pricingRuleRepository.findById(eq(ruleId))).thenReturn(Optional.of(rule));
@@ -173,8 +185,15 @@ class DeliveryPricingServiceTest {
         Field idField = User.class.getDeclaredField("id");
         idField.setAccessible(true);
         idField.set(otherUser, UUID.randomUUID());
+        
+        Company otherCompany = new Company();
+        Field companyIdField = Company.class.getDeclaredField("id");
+        companyIdField.setAccessible(true);
+        companyIdField.set(otherCompany, UUID.randomUUID());
+        otherCompany.setName("Other Company");
+        otherUser.setCompany(otherCompany);
 
-        DeliveryPricingRule rule = new DeliveryPricingRule(otherUser, "Test Rule", BigDecimal.ONE);
+        DeliveryPricingRule rule = new DeliveryPricingRule(otherCompany, "Test Rule", BigDecimal.ONE);
         setRuleId(rule, ruleId);
 
         when(pricingRuleRepository.findById(eq(ruleId))).thenReturn(Optional.of(rule));
@@ -188,18 +207,18 @@ class DeliveryPricingServiceTest {
     void testGetUserPricingRules() {
         // Given
         List<DeliveryPricingRule> rules = Arrays.asList(
-            new DeliveryPricingRule(testUser, "Rule 1", BigDecimal.ONE),
-            new DeliveryPricingRule(testUser, "Rule 2", BigDecimal.valueOf(2))
+            new DeliveryPricingRule(testCompany, "Rule 1", BigDecimal.ONE),
+            new DeliveryPricingRule(testCompany, "Rule 2", BigDecimal.valueOf(2))
         );
 
-        when(pricingRuleRepository.findByUserAndIsActive(testUser, true)).thenReturn(rules);
+        when(pricingRuleRepository.findByCompanyAndIsActive(testCompany, true)).thenReturn(rules);
 
         // When
         List<DeliveryPricingRule> result = pricingService.getUserPricingRules(testUser);
 
         // Then
         assertEquals(2, result.size());
-        verify(pricingRuleRepository).findByUserAndIsActive(testUser, true);
+        verify(pricingRuleRepository).findByCompanyAndIsActive(testCompany, true);
     }
 
     @Test
@@ -224,11 +243,11 @@ class DeliveryPricingServiceTest {
         request.setDeliveryDistrict("Chamkarmon");
         request.setEstimatedValue(BigDecimal.valueOf(50));
 
-        DeliveryPricingRule rule = new DeliveryPricingRule(testUser, "Phnom Penh Rule", BigDecimal.valueOf(2.00));
+        DeliveryPricingRule rule = new DeliveryPricingRule(testCompany, "Phnom Penh Rule", BigDecimal.valueOf(2.00));
         rule.setProvince("Phnom Penh");
         rule.setPriority(10);
 
-        when(pricingRuleRepository.findApplicableRules(testUser, "Phnom Penh", "Chamkarmon"))
+        when(pricingRuleRepository.findApplicableRules(testCompany, "Phnom Penh", "Chamkarmon"))
             .thenReturn(Arrays.asList(rule));
 
         // When
@@ -236,7 +255,7 @@ class DeliveryPricingServiceTest {
 
         // Then
         assertEquals(BigDecimal.valueOf(2.00).setScale(2), result.setScale(2));
-        verify(pricingRuleRepository).findApplicableRules(testUser, "Phnom Penh", "Chamkarmon");
+        verify(pricingRuleRepository).findApplicableRules(testCompany, "Phnom Penh", "Chamkarmon");
     }
 
     @Test
@@ -246,11 +265,11 @@ class DeliveryPricingServiceTest {
         request.setDeliveryProvince("Phnom Penh");
         request.setEstimatedValue(BigDecimal.valueOf(150)); // Above threshold
 
-        DeliveryPricingRule rule = new DeliveryPricingRule(testUser, "High Value Rule", BigDecimal.valueOf(2.00));
+        DeliveryPricingRule rule = new DeliveryPricingRule(testCompany, "High Value Rule", BigDecimal.valueOf(2.00));
         rule.setHighValueThreshold(BigDecimal.valueOf(100));
         rule.setHighValueSurcharge(BigDecimal.valueOf(5.00));
 
-        when(pricingRuleRepository.findApplicableRules(testUser, "Phnom Penh", null))
+        when(pricingRuleRepository.findApplicableRules(testCompany, "Phnom Penh", null))
             .thenReturn(Arrays.asList(rule));
 
         // When
@@ -268,7 +287,7 @@ class DeliveryPricingServiceTest {
         request.setDeliveryProvince("Phnom Penh");
         request.setEstimatedValue(BigDecimal.valueOf(50));
 
-        when(pricingRuleRepository.findApplicableRules(testUser, "Phnom Penh", null))
+        when(pricingRuleRepository.findApplicableRules(testCompany, "Phnom Penh", null))
             .thenReturn(Arrays.asList());
 
         // When
@@ -286,7 +305,7 @@ class DeliveryPricingServiceTest {
         request.setDeliveryProvince("Phnom Penh");
         request.setEstimatedValue(BigDecimal.valueOf(50));
 
-        when(pricingRuleRepository.findApplicableRules(testUser, "Phnom Penh", null))
+        when(pricingRuleRepository.findApplicableRules(testCompany, "Phnom Penh", null))
             .thenReturn(Arrays.asList());
 
         // When
@@ -302,7 +321,7 @@ class DeliveryPricingServiceTest {
         CreateDeliveryRequest request = new CreateDeliveryRequest();
         request.setDeliveryFeeModel("FREE");
 
-        when(pricingRuleRepository.findApplicableRules(testUser, null, null))
+        when(pricingRuleRepository.findApplicableRules(testCompany, null, null))
             .thenReturn(Arrays.asList());
 
         // When
