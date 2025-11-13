@@ -36,6 +36,7 @@ import com.delivery.deliveryapi.repo.PendingEmployeeRepository;
 import com.delivery.deliveryapi.repo.UserAuditRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
 import com.delivery.deliveryapi.security.JwtService;
+import com.delivery.deliveryapi.service.AdminUserService;
 import com.delivery.deliveryapi.service.CompanyAssignmentService;
 import com.delivery.deliveryapi.service.TelegramAuthService;
 import io.jsonwebtoken.Claims;
@@ -58,6 +59,7 @@ public class AuthController {
     private final EmployeeRepository employeeRepository;
     private final PendingEmployeeRepository pendingEmployeeRepository;
     private final CompanyAssignmentService companyAssignmentService;
+    private final AdminUserService adminUserService;
 
     public AuthController(TelegramAuthService telegramAuthService,
                           UserRepository userRepository,
@@ -68,6 +70,7 @@ public class AuthController {
                           EmployeeRepository employeeRepository,
                           PendingEmployeeRepository pendingEmployeeRepository,
                           CompanyAssignmentService companyAssignmentService,
+                          AdminUserService adminUserService,
                           @Value("${jwt.dev-enabled:false}") boolean devTokenEnabled) {
         this.telegramAuthService = telegramAuthService;
         this.userRepository = userRepository;
@@ -78,6 +81,7 @@ public class AuthController {
         this.employeeRepository = employeeRepository;
         this.pendingEmployeeRepository = pendingEmployeeRepository;
         this.companyAssignmentService = companyAssignmentService;
+        this.adminUserService = adminUserService;
         this.devTokenEnabled = devTokenEnabled;
     }
 
@@ -458,6 +462,84 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Profile updated successfully"));
     }
 
+    public record ChangePasswordRequest(String currentPassword, String newPassword) {}
+
+    @PostMapping("/change-password")
+    @Transactional
+    public ResponseEntity<Object> changePassword(@RequestBody ChangePasswordRequest req) {
+        // Get current user from security context
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID userId;
+        try {
+            userId = UUID.fromString(userIdStr);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        // Validate request
+        if (req.currentPassword == null || req.currentPassword.trim().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Current password is required"));
+        }
+        if (req.newPassword == null || req.newPassword.trim().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "New password is required"));
+        }
+        if (req.newPassword.length() < 8) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "New password must be at least 8 characters long"));
+        }
+
+        // Change password
+        boolean success = adminUserService.changePassword(userId, req.currentPassword, req.newPassword);
+        if (!success) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Current password is incorrect"));
+        }
+
+        return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
+    }
+
+    public record SetPasswordRequest(String newPassword) {}
+
+    @PostMapping("/set-password")
+    @Transactional
+    public ResponseEntity<Object> setPassword(@RequestBody SetPasswordRequest req) {
+        // Get current user from security context
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID userId;
+        try {
+            userId = UUID.fromString(userIdStr);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        // Validate request
+        if (req.newPassword == null || req.newPassword.trim().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "New password is required"));
+        }
+        if (req.newPassword.length() < 8) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "New password must be at least 8 characters long"));
+        }
+
+        // Set password
+        boolean success = adminUserService.setPassword(userId, req.newPassword);
+        if (!success) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "System administrators cannot use this endpoint"));
+        }
+
+        return ResponseEntity.ok(Map.of("message", "Password set successfully"));
+    }
+
     // This method should be called when phone number is first verified during OTP process
     // It handles automatic company assignment for pending employee invitations
     @Transactional
@@ -613,13 +695,16 @@ public class AuthController {
         }
         User user = optUser.get();
 
-        // Check if user is a member of the company
-        if (user.getCompany() == null || !user.getCompany().getId().equals(companyId)) {
+        // System administrators can view employees from any company
+        boolean isSystemAdmin = user.getUserRole() == UserRole.SYSTEM_ADMINISTRATOR;
+
+        // Regular users must be members of the company
+        if (!isSystemAdmin && (user.getCompany() == null || !user.getCompany().getId().equals(companyId))) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "You must be a member of this company"));
         }
 
-        // Only owners and managers can view employees
-        if (user.getUserRole() != UserRole.OWNER && user.getUserRole() != UserRole.MANAGER) {
+        // Only owners, managers, and system administrators can view employees
+        if (!isSystemAdmin && user.getUserRole() != UserRole.OWNER && user.getUserRole() != UserRole.MANAGER) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Only owners and managers can view employees"));
         }
 
@@ -663,6 +748,64 @@ public class AuthController {
         }
 
         return ResponseEntity.ok(new CompanyEmployeesResponse(employeeInfos, employeeInfos.size()));
+    }
+
+    public record LoginRequest(String username, String password) {}
+
+    @PostMapping("/login")
+    public ResponseEntity<Object> login(@RequestBody LoginRequest req) {
+        try {
+            // Authenticate admin user
+            boolean authenticated = adminUserService.authenticateAdmin(req.username, req.password);
+            
+            if (!authenticated) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Invalid username or password"));
+            }
+
+            // Get user details
+            Optional<User> optUser = adminUserService.findAdminByUsername(req.username);
+            if (optUser.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "User not found"));
+            }
+            User user = optUser.get();
+
+            String display;
+            if (user.getFullName() != null) {
+                display = user.getFullName();
+            } else if (user.getDisplayName() != null) {
+                display = user.getDisplayName();
+            } else {
+                display = user.getUsername();
+            }
+
+            String accessToken = jwtService.generateAccessToken(
+                user.getId(),
+                user.getUsername(),
+                Map.of("provider", "LOCAL")
+            );
+
+            String refreshToken = jwtService.generateRefreshToken(user.getId(), user.getUsername());
+
+            // Store refresh token
+            jwtService.storeRefreshToken(refreshToken, user.getId(), user.getUsername(), "local-login");
+
+            return ResponseEntity.ok(new AuthResponse(
+                accessToken,
+                refreshToken,
+                user.getId(),
+                display,
+                user.getUsername(),
+                "LOCAL",
+                14400L * 60, // 4 hours in seconds
+                10080L * 60  // 7 days in seconds
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Login failed"));
+        }
     }
 
     public record RefreshRequest(String refreshToken) {}
