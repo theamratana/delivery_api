@@ -13,11 +13,13 @@ import com.delivery.deliveryapi.controller.DeliveryController.CreateDeliveryRequ
 import com.delivery.deliveryapi.model.Company;
 import com.delivery.deliveryapi.model.DeliveryItem;
 import com.delivery.deliveryapi.model.DeliveryPhoto;
+import com.delivery.deliveryapi.model.Product;
 import com.delivery.deliveryapi.model.User;
 import com.delivery.deliveryapi.model.UserType;
 import com.delivery.deliveryapi.repo.CompanyRepository;
 import com.delivery.deliveryapi.repo.DeliveryItemRepository;
 import com.delivery.deliveryapi.repo.DeliveryPhotoRepository;
+import com.delivery.deliveryapi.repo.ProductRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
 
 @Service
@@ -32,17 +34,23 @@ public class DeliveryService {
     private final CompanyRepository companyRepository;
     private final DeliveryPhotoRepository deliveryPhotoRepository;
     private final DeliveryPricingService deliveryPricingService;
+    private final ProductService productService;
+    private final ProductRepository productRepository;
 
     public DeliveryService(DeliveryItemRepository deliveryItemRepository,
                           UserRepository userRepository,
                           CompanyRepository companyRepository,
                           DeliveryPhotoRepository deliveryPhotoRepository,
-                          DeliveryPricingService deliveryPricingService) {
+                          DeliveryPricingService deliveryPricingService,
+                          ProductService productService,
+                          ProductRepository productRepository) {
         this.deliveryItemRepository = deliveryItemRepository;
         this.userRepository = userRepository;
         this.companyRepository = companyRepository;
         this.deliveryPhotoRepository = deliveryPhotoRepository;
         this.deliveryPricingService = deliveryPricingService;
+        this.productService = productService;
+        this.productRepository = productRepository;
     }
 
     @Transactional
@@ -54,22 +62,55 @@ public class DeliveryService {
 
         // Find or create receiver
         User receiver = findOrCreateReceiver(request.getReceiverPhone(), request.getReceiverName());
+        boolean autoCreatedReceiver = receiver.isIncomplete();
         log.info("Using receiver: {} ({})", receiver.getId(), receiver.getPhoneE164());
 
         // Find or create delivery company/driver
         Company deliveryCompany = null;
         User deliveryDriver = null;
+        boolean autoCreatedCompany = false;
+        boolean autoCreatedDriver = false;
 
         if (DELIVERY_TYPE_COMPANY.equalsIgnoreCase(request.getDeliveryType())) {
             deliveryCompany = findOrCreateCompany(request.getCompanyName());
+            autoCreatedCompany = true; // All companies created here are auto-created
             log.info("Using delivery company: {} ({})", deliveryCompany.getId(), deliveryCompany.getName());
         } else if (DELIVERY_TYPE_DRIVER.equalsIgnoreCase(request.getDeliveryType())) {
             deliveryDriver = findOrCreateDriver(request.getDriverPhone());
+            autoCreatedDriver = deliveryDriver.isIncomplete();
             log.info("Using delivery driver: {} ({})", deliveryDriver.getId(), deliveryDriver.getPhoneE164());
         }
 
         // Calculate delivery fee using user's pricing rules
         BigDecimal deliveryFee = deliveryPricingService.calculateDeliveryFee(sender, request);
+
+        // Handle product selection/creation
+        Product product = null;
+        boolean autoCreatedProduct = false;
+
+        if (Boolean.TRUE.equals(request.getUseExistingProduct()) && request.getProductId() != null) {
+            // Use existing product
+            Optional<Product> existingProduct = productRepository.findById(request.getProductId());
+            if (existingProduct.isPresent()) {
+                product = existingProduct.get();
+                // Check if user has access to this product (same company)
+                if (!product.getCompany().getId().equals(sender.getCompany().getId())) {
+                    throw new IllegalArgumentException("Access denied: Product belongs to different company");
+                }
+                // Update usage statistics
+                product.setUsageCount(product.getUsageCount() + 1);
+                product.setLastUsedAt(OffsetDateTime.now());
+                productRepository.save(product);
+                log.info("Using existing product: {} for delivery", product.getId());
+            } else {
+                throw new IllegalArgumentException("Product not found");
+            }
+        } else if (Boolean.TRUE.equals(request.getCreateProductFromDelivery())) {
+            // Create product from this delivery
+            product = productService.createProductFromDelivery(sender, request.getItemDescription(), request.getEstimatedValue(), deliveryFee);
+            autoCreatedProduct = true;
+            log.info("Auto-created product: {} from delivery", product.getId());
+        }
 
         // Create delivery item
         DeliveryItem delivery = new DeliveryItem();
@@ -87,6 +128,14 @@ public class DeliveryService {
         delivery.setItemValue(request.getEstimatedValue());
         delivery.setDeliveryFee(deliveryFee);
         delivery.setEstimatedDeliveryTime(OffsetDateTime.now().plusHours(2)); // Default 2 hours
+
+        // Set product and auto-creation flags
+        delivery.setProduct(product);
+        delivery.setAutoCreatedCompany(autoCreatedCompany);
+        delivery.setAutoCreatedDriver(autoCreatedDriver);
+        delivery.setAutoCreatedReceiver(autoCreatedReceiver);
+        delivery.setAutoCreatedProduct(autoCreatedProduct);
+        delivery.setFeeAutoCalculated(true); // Fee is always auto-calculated
 
         delivery = deliveryItemRepository.save(delivery);
         log.info("Created delivery item: {}", delivery.getId());

@@ -176,6 +176,15 @@ public class DeliveryController {
         @JsonProperty("specialInstructions")
         private String specialInstructions;
 
+        @JsonProperty("useExistingProduct")
+        private Boolean useExistingProduct;
+
+        @JsonProperty("productId")
+        private UUID productId;
+
+        @JsonProperty("createProductFromDelivery")
+        private Boolean createProductFromDelivery;
+
         // Getters and setters
         public String getReceiverPhone() { return receiverPhone; }
         public void setReceiverPhone(String receiverPhone) { this.receiverPhone = receiverPhone; }
@@ -230,6 +239,15 @@ public class DeliveryController {
 
         public String getSpecialInstructions() { return specialInstructions; }
         public void setSpecialInstructions(String specialInstructions) { this.specialInstructions = specialInstructions; }
+
+        public Boolean getUseExistingProduct() { return useExistingProduct; }
+        public void setUseExistingProduct(Boolean useExistingProduct) { this.useExistingProduct = useExistingProduct; }
+
+        public UUID getProductId() { return productId; }
+        public void setProductId(UUID productId) { this.productId = productId; }
+
+        public Boolean getCreateProductFromDelivery() { return createProductFromDelivery; }
+        public void setCreateProductFromDelivery(Boolean createProductFromDelivery) { this.createProductFromDelivery = createProductFromDelivery; }
     }
 
     public static class DeliveryResponse {

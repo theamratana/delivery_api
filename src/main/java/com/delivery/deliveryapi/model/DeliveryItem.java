@@ -99,6 +99,29 @@ public class DeliveryItem extends AuditableEntity {
     @Column(name = "currency", length = 3)
     private String currency = "USD";
 
+    // Enhanced delivery product features
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id")
+    private Product product;
+
+    @Column(name = "photo_urls", columnDefinition = "TEXT")
+    private String photoUrls; // JSON array of photo URLs
+
+    @Column(name = "auto_created_company", nullable = false)
+    private Boolean autoCreatedCompany = false;
+
+    @Column(name = "auto_created_driver", nullable = false)
+    private Boolean autoCreatedDriver = false;
+
+    @Column(name = "auto_created_receiver", nullable = false)
+    private Boolean autoCreatedReceiver = false;
+
+    @Column(name = "auto_created_product", nullable = false)
+    private Boolean autoCreatedProduct = false;
+
+    @Column(name = "fee_auto_calculated", nullable = false)
+    private Boolean feeAutoCalculated = false;
+
     // Constructors
     public DeliveryItem() {}
 
@@ -172,4 +195,25 @@ public class DeliveryItem extends AuditableEntity {
 
     public String getCurrency() { return currency; }
     public void setCurrency(String currency) { this.currency = currency; }
+
+    public Product getProduct() { return product; }
+    public void setProduct(Product product) { this.product = product; }
+
+    public String getPhotoUrls() { return photoUrls; }
+    public void setPhotoUrls(String photoUrls) { this.photoUrls = photoUrls; }
+
+    public Boolean getAutoCreatedCompany() { return autoCreatedCompany; }
+    public void setAutoCreatedCompany(Boolean autoCreatedCompany) { this.autoCreatedCompany = autoCreatedCompany; }
+
+    public Boolean getAutoCreatedDriver() { return autoCreatedDriver; }
+    public void setAutoCreatedDriver(Boolean autoCreatedDriver) { this.autoCreatedDriver = autoCreatedDriver; }
+
+    public Boolean getAutoCreatedReceiver() { return autoCreatedReceiver; }
+    public void setAutoCreatedReceiver(Boolean autoCreatedReceiver) { this.autoCreatedReceiver = autoCreatedReceiver; }
+
+    public Boolean getAutoCreatedProduct() { return autoCreatedProduct; }
+    public void setAutoCreatedProduct(Boolean autoCreatedProduct) { this.autoCreatedProduct = autoCreatedProduct; }
+
+    public Boolean getFeeAutoCalculated() { return feeAutoCalculated; }
+    public void setFeeAutoCalculated(Boolean feeAutoCalculated) { this.feeAutoCalculated = feeAutoCalculated; }
 }
