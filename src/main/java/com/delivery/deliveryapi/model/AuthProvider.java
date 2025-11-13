@@ -5,5 +5,6 @@ public enum AuthProvider {
     PHONE,
     GOOGLE,
     FACEBOOK,
-    TIKTOK
+    TIKTOK,
+    LOCAL
 }
