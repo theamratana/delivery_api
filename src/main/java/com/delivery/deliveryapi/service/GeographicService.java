@@ -52,6 +52,58 @@ public class GeographicService {
         return provinceRepository.searchByName(search.trim());
     }
 
+    @Transactional
+    public Province createProvince(String code, String name, String khmerName, String capital,
+                                  Integer population, Integer areaKm2, Integer districtsKhan,
+                                  Integer communesSangkat, Integer totalVillages,
+                                  String referenceNumber, Integer referenceYear) {
+        if (provinceRepository.existsByCode(code)) {
+            throw new IllegalArgumentException("Province with code '" + code + "' already exists");
+        }
+
+        Province province = new Province();
+        province.setCode(code);
+        province.setName(name);
+        province.setNameKh(khmerName);
+        province.setCapital(capital);
+        province.setPopulation(population);
+        province.setAreaKm2(areaKm2);
+        province.setDistrictsKhan(districtsKhan);
+        province.setCommunesSangkat(communesSangkat);
+        province.setTotalVillages(totalVillages);
+        province.setReferenceNumber(referenceNumber);
+        province.setReferenceYear(referenceYear);
+        province.setActive(true);
+
+        return provinceRepository.save(province);
+    }
+
+    @Transactional
+    public Province updateProvince(UUID provinceId, String name, String khmerName, String capital,
+                                  Integer population, Integer areaKm2, Integer districtsKhan,
+                                  Integer communesSangkat, Integer totalVillages,
+                                  String referenceNumber, Integer referenceYear) {
+        if (provinceId == null) {
+            throw new IllegalArgumentException("Province ID cannot be null");
+        }
+
+        Province province = provinceRepository.findById(provinceId)
+                .orElseThrow(() -> new IllegalArgumentException("Province not found"));
+
+        province.setName(name);
+        province.setNameKh(khmerName);
+        province.setCapital(capital);
+        province.setPopulation(population);
+        province.setAreaKm2(areaKm2);
+        province.setDistrictsKhan(districtsKhan);
+        province.setCommunesSangkat(communesSangkat);
+        province.setTotalVillages(totalVillages);
+        province.setReferenceNumber(referenceNumber);
+        province.setReferenceYear(referenceYear);
+
+        return provinceRepository.save(province);
+    }
+
     // District operations
     @Transactional(readOnly = true)
     public List<District> getAllActiveDistricts() {
