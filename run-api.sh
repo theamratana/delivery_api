@@ -13,6 +13,7 @@ port_in_use() {
 	if command -v netstat >/dev/null 2>&1; then
 		netstat -an 2>/dev/null | grep -E "LISTEN|LISTENING" | grep -q ":${p}"
 	else
+		# Fallback for minimalist shells: try opening a TCP connection
 		(echo > "/dev/tcp/127.0.0.1/${p}") >/dev/null 2>&1
 	fi
 }
@@ -56,6 +57,21 @@ kill_on_port() {
 	fi
 }
 
+# Wait up to N seconds for the port to become free. Returns 0 if free, 1 if timed out.
+wait_for_port_free() {
+	local p="$1"
+	local timeout_seconds=${2:-10}
+	local waited=0
+	while port_in_use "$p"; do
+		if [ "$waited" -ge "$timeout_seconds" ]; then
+			return 1
+		fi
+		sleep 1
+		waited=$((waited + 1))
+	done
+	return 0
+}
+
 cmd="${1:-start}"
 
 case "$cmd" in
@@ -63,7 +79,12 @@ case "$cmd" in
 		echo "Stopping API server on port ${SERVER_PORT}..."
 		if port_in_use "$SERVER_PORT"; then
 			kill_on_port "$SERVER_PORT"
-			echo "✅ API server stopped successfully."
+			# Wait a few seconds for the port to be released
+			if wait_for_port_free "$SERVER_PORT" 15; then
+				echo "✅ API server stopped successfully."
+			else
+				echo "⚠️  Port ${SERVER_PORT} still appears in use after stop; you may need to investigate." >&2
+			fi
 		else
 			echo "ℹ️  No API server running on port ${SERVER_PORT}."
 		fi
@@ -80,28 +101,42 @@ case "$cmd" in
 	restart)
 		echo "Restarting API server..."
 		"$0" stop || true
-		sleep 2
+		# ensure the port is free before starting
+		if ! wait_for_port_free "$SERVER_PORT" 15; then
+			echo "⚠️  Port ${SERVER_PORT} didn't free in time; proceeding to start may fail." >&2
+		fi
+		sleep 1
 		"$0" start
 		;;
 	start|*)
-		# Ensure only 8081 is used: free it first if needed
+		# Ensure port is free (stop any existing process first)
 		if port_in_use "$SERVER_PORT"; then
 			echo "Port ${SERVER_PORT} is busy. Stopping existing process..."
 			kill_on_port "$SERVER_PORT"
-			sleep 1
-			if port_in_use "$SERVER_PORT"; then
+			if ! wait_for_port_free "$SERVER_PORT" 15; then
 				echo "❌ ERROR: Could not free port ${SERVER_PORT}." >&2
 				exit 1
 			fi
 		fi
-			echo "🚀 Starting API server on port ${SERVER_PORT}..."
-			if [ -x "./gradlew" ]; then
-				./gradlew bootRun &
-				echo $! > .pid_api
-			else
-				./gradle-8.5/bin/gradle bootRun &
-				echo $! > .pid_api
-			fi
-			echo "✅ API server started (PID: $(cat .pid_api))"
+		
+		echo "🚀 Starting API server on port ${SERVER_PORT}..."
+		# Choose a launch mechanism that survives shell exit if available
+		if [ -x "./gradlew" ]; then
+			LAUNCH_CMD=("./gradlew" "bootRun" "-Dspring.profiles.active=production")
+		else
+			LAUNCH_CMD=("./gradle-8.5/bin/gradle" "bootRun" "-Dspring.profiles.active=production")
+		fi
+		# redirect logs to .api.log for easy inspection
+		if command -v nohup >/dev/null 2>&1; then
+			nohup "${LAUNCH_CMD[@]}" > .api.log 2>&1 &
+			echo $! > .pid_api
+		elif command -v setsid >/dev/null 2>&1; then
+			setsid "${LAUNCH_CMD[@]}" > .api.log 2>&1 &
+			echo $! > .pid_api
+		else
+			"${LAUNCH_CMD[@]}" > .api.log 2>&1 &
+			echo $! > .pid_api
+		fi
+		echo "✅ API server started (PID: $(cat .pid_api)). Logs -> .api.log"
 		;;
 esac
