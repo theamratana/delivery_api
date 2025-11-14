@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.deliveryapi.controller.DeliveryController.CreateDeliveryRequest;
 import com.delivery.deliveryapi.model.Company;
+import com.delivery.deliveryapi.model.DeliveryPackage;
+import com.delivery.deliveryapi.model.DeliveryPackageStatus;
 import com.delivery.deliveryapi.model.DeliveryItem;
 import com.delivery.deliveryapi.model.DeliveryPhoto;
 import com.delivery.deliveryapi.model.Product;
@@ -37,6 +40,7 @@ public class DeliveryService {
     private final DeliveryPricingService deliveryPricingService;
     private final ProductService productService;
     private final ProductRepository productRepository;
+    private final com.delivery.deliveryapi.repo.DeliveryPackageRepository deliveryPackageRepository;
 
     public DeliveryService(DeliveryItemRepository deliveryItemRepository,
                           UserRepository userRepository,
@@ -44,7 +48,8 @@ public class DeliveryService {
                           DeliveryPhotoRepository deliveryPhotoRepository,
                           DeliveryPricingService deliveryPricingService,
                           ProductService productService,
-                          ProductRepository productRepository) {
+                          ProductRepository productRepository,
+                          com.delivery.deliveryapi.repo.DeliveryPackageRepository deliveryPackageRepository) {
         this.deliveryItemRepository = deliveryItemRepository;
         this.userRepository = userRepository;
         this.companyRepository = companyRepository;
@@ -52,6 +57,7 @@ public class DeliveryService {
         this.deliveryPricingService = deliveryPricingService;
         this.productService = productService;
         this.productRepository = productRepository;
+        this.deliveryPackageRepository = deliveryPackageRepository;
     }
 
     @Transactional
@@ -59,6 +65,8 @@ public class DeliveryService {
         log.info("Creating batch delivery for sender: {} to receiver phone: {} with {} items", 
             sender.getId(), request.getReceiverPhone(), 
             request.getItems() != null ? request.getItems().size() : 0);
+
+        // Will create DeliveryPackage after fee calculation so fee can be stored on the package
 
         // Validate request
         validateCreateDeliveryRequest(request);
@@ -112,6 +120,13 @@ public class DeliveryService {
         } else {
             log.debug("Using frontend-provided fee: {}", deliveryFee);
         }
+
+        // Create a DeliveryPackage to represent this batch and keep lifecycle metadata
+        com.delivery.deliveryapi.model.DeliveryPackage pkg = new com.delivery.deliveryapi.model.DeliveryPackage();
+        pkg.setSender(sender);
+        pkg.setDeliveryFee(deliveryFee);
+        pkg = deliveryPackageRepository.save(pkg);
+        UUID batchId = pkg.getId();
 
         // Process each item in the batch and return the first one created
         // (primary delivery item for response, all items share same receiver/company/driver/fee)
@@ -217,6 +232,9 @@ public class DeliveryService {
             delivery.setAutoCreatedProduct(autoCreatedProduct);
             delivery.setFeeAutoCalculated(true);
 
+            // Assign the batch id so all items created in this POST share the same batch
+            delivery.setBatchId(batchId);
+
             delivery = deliveryItemRepository.save(delivery);
             log.info("Created delivery item {}/{}: {}", itemIndex + 1, request.getItems().size(), delivery.getId());
 
@@ -237,6 +255,129 @@ public class DeliveryService {
 
         log.info("Batch delivery creation completed with {} items", request.getItems().size());
         return firstDelivery;
+    }
+
+    @Transactional
+    public java.util.List<DeliveryItem> appendItemsToBatch(User sender, java.util.UUID batchId,
+            java.util.List<com.delivery.deliveryapi.controller.DeliveryController.DeliveryItemPayload> items) {
+        if (batchId == null) throw new IllegalArgumentException("batchId is required");
+
+        // Ensure package exists and is appendable
+        var optPkg = deliveryPackageRepository.findById(batchId);
+        if (optPkg.isEmpty()) {
+            throw new IllegalArgumentException("Batch not found: " + batchId);
+        }
+        DeliveryPackage pkg = optPkg.get();
+        if (pkg.getStatus() != DeliveryPackageStatus.CREATED && pkg.getStatus() != DeliveryPackageStatus.AWAITING_PICKUP) {
+            throw new IllegalArgumentException("Cannot append items to package in status: " + pkg.getStatus());
+        }
+
+        java.util.List<DeliveryItem> existing = deliveryItemRepository.findByBatchId(batchId);
+        if (existing == null || existing.isEmpty()) {
+            throw new IllegalArgumentException("No existing items found for batch: " + batchId);
+        }
+
+        // Use first item as context
+        DeliveryItem context = existing.get(0);
+
+        // Only allow append if sender is the original sender or in same company
+        if (!sender.getId().equals(context.getSender().getId())) {
+            if (sender.getCompany() == null || context.getSender().getCompany() == null ||
+                !sender.getCompany().getId().equals(context.getSender().getCompany().getId())) {
+                throw new IllegalArgumentException("Not allowed to append items to this batch");
+            }
+        }
+
+        java.util.List<DeliveryItem> created = new java.util.ArrayList<>();
+
+        for (int i = 0; i < items.size(); i++) {
+            var itemPayload = items.get(i);
+
+            // reuse product resolution logic from createDelivery (copying simplified logic)
+            Product product = null;
+            boolean autoCreatedProduct = false;
+
+            if (itemPayload.getProductId() != null) {
+                Optional<Product> existingProduct = productRepository.findById(itemPayload.getProductId());
+                if (existingProduct.isPresent()) {
+                    product = existingProduct.get();
+                    if (!product.getCompany().getId().equals(sender.getCompany().getId())) {
+                        throw new IllegalArgumentException("Access denied: Product belongs to different company");
+                    }
+                    product.setUsageCount(product.getUsageCount() + 1);
+                    product.setLastUsedAt(java.time.OffsetDateTime.now());
+                    productRepository.save(product);
+                } else {
+                    throw new IllegalArgumentException("Product not found: " + itemPayload.getProductId());
+                }
+            } else if (itemPayload.getProductName() != null && !itemPayload.getProductName().trim().isEmpty()) {
+                String searchName = itemPayload.getProductName().trim();
+                java.util.List<Product> existingProducts = productRepository.searchProductsByName(sender.getCompany().getId(), searchName);
+                if (!existingProducts.isEmpty()) {
+                    product = existingProducts.get(0);
+                    product.setUsageCount(product.getUsageCount() + 1);
+                    product.setLastUsedAt(java.time.OffsetDateTime.now());
+                    productRepository.save(product);
+                } else {
+                    product = productService.createProductFromDelivery(sender, itemPayload.getProductName(), itemPayload.getEstimatedValue(), context.getDeliveryFee());
+                    productRepository.flush();
+                    autoCreatedProduct = true;
+                }
+            } else if (itemPayload.getItemDescription() != null && !itemPayload.getItemDescription().trim().isEmpty()) {
+                String fallbackName = itemPayload.getItemDescription().length() > 100 ?
+                    itemPayload.getItemDescription().substring(0, 100) : itemPayload.getItemDescription();
+                java.util.List<Product> existingProducts = productRepository.searchProductsByName(sender.getCompany().getId(), fallbackName);
+                if (!existingProducts.isEmpty()) {
+                    product = existingProducts.get(0);
+                    product.setUsageCount(product.getUsageCount() + 1);
+                    product.setLastUsedAt(java.time.OffsetDateTime.now());
+                    productRepository.save(product);
+                } else {
+                    product = productService.createProductFromDelivery(sender, fallbackName, itemPayload.getEstimatedValue(), context.getDeliveryFee());
+                    productRepository.flush();
+                    autoCreatedProduct = true;
+                }
+            } else {
+                throw new IllegalArgumentException("Item " + (i + 1) + ": productName or itemDescription is required");
+            }
+
+            DeliveryItem delivery = new DeliveryItem();
+            delivery.setSender(sender);
+            delivery.setReceiver(context.getReceiver());
+            delivery.setDeliveryCompany(context.getDeliveryCompany());
+            delivery.setDeliveryDriver(context.getDeliveryDriver());
+            delivery.setItemDescription(itemPayload.getItemDescription());
+            delivery.setPaymentMethod(context.getPaymentMethod());
+
+            delivery.setPickupAddress(context.getPickupAddress());
+            delivery.setPickupProvince(context.getPickupProvince());
+            delivery.setPickupDistrict(context.getPickupDistrict());
+
+            delivery.setDeliveryAddress(context.getDeliveryAddress());
+            delivery.setDeliveryProvince(context.getDeliveryProvince());
+            delivery.setDeliveryDistrict(context.getDeliveryDistrict());
+            delivery.setItemValue(itemPayload.getEstimatedValue());
+            delivery.setQuantity(itemPayload.getQuantity());
+
+            // IMPORTANT: Keep the original delivery fee unchanged
+            delivery.setDeliveryFee(context.getDeliveryFee());
+            delivery.setEstimatedDeliveryTime(context.getEstimatedDeliveryTime());
+
+            delivery.setProduct(product);
+            delivery.setAutoCreatedCompany(false);
+            delivery.setAutoCreatedDriver(false);
+            delivery.setAutoCreatedReceiver(false);
+            delivery.setAutoCreatedProduct(autoCreatedProduct);
+            delivery.setFeeAutoCalculated(context.getFeeAutoCalculated() != null ? context.getFeeAutoCalculated() : true);
+
+            // Keep the same batch id
+            delivery.setBatchId(batchId);
+
+            delivery = deliveryItemRepository.save(delivery);
+            created.add(delivery);
+        }
+
+        return created;
     }
 
     private void validateCreateDeliveryRequest(CreateDeliveryRequest request) {
@@ -280,9 +421,19 @@ public class DeliveryService {
             if (request.getCompanyPhone() == null || request.getCompanyPhone().trim().isEmpty()) {
                 throw new IllegalArgumentException("Company phone is required for company deliveries");
             }
-        } else if (DELIVERY_TYPE_DRIVER.equalsIgnoreCase(deliveryType) &&
-                   (request.getDriverPhone() == null || request.getDriverPhone().trim().isEmpty())) {
-            throw new IllegalArgumentException("Driver phone is required for driver deliveries");
+        } else if (DELIVERY_TYPE_DRIVER.equalsIgnoreCase(deliveryType)) {
+            // Accept either driverPhone or companyPhone for driver deliveries (for backward compatibility)
+            boolean hasDriverPhone = request.getDriverPhone() != null && !request.getDriverPhone().trim().isEmpty();
+            boolean hasCompanyPhone = request.getCompanyPhone() != null && !request.getCompanyPhone().trim().isEmpty();
+            
+            if (!hasDriverPhone && !hasCompanyPhone) {
+                throw new IllegalArgumentException("Driver phone is required for driver deliveries");
+            }
+            
+            // If companyPhone is provided but not driverPhone, copy it over
+            if (!hasDriverPhone && hasCompanyPhone) {
+                request.setDriverPhone(request.getCompanyPhone());
+            }
         }
     }
 

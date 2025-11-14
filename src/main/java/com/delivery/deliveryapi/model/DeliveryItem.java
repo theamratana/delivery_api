@@ -105,6 +105,9 @@ public class DeliveryItem extends AuditableEntity {
     @Column(name = "quantity", nullable = false)
     private Integer quantity = 1; // Product quantity (default 1)
 
+    @Column(name = "batch_id")
+    private java.util.UUID batchId; // Identifier for the batch (all items created in one POST)
+
     @Column(name = "currency", length = 3)
     private String currency = "USD";
 
@@ -207,6 +210,9 @@ public class DeliveryItem extends AuditableEntity {
 
     public Integer getQuantity() { return quantity != null ? quantity : 1; }
     public void setQuantity(Integer quantity) { this.quantity = quantity != null && quantity > 0 ? quantity : 1; }
+
+    public java.util.UUID getBatchId() { return batchId; }
+    public void setBatchId(java.util.UUID batchId) { this.batchId = batchId; }
 
     public String getCurrency() { return currency; }
     public void setCurrency(String currency) { this.currency = currency; }

@@ -23,8 +23,9 @@ import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.delivery.deliveryapi.controller.DeliveryController.CreateDeliveryRequest;
-import com.delivery.deliveryapi.model.DeliveryPricingRule;
+import com.delivery.deliveryapi.controller.DeliveryPricingController.PriceCalculationRequest;
 import com.delivery.deliveryapi.model.Company;
+import com.delivery.deliveryapi.model.DeliveryPricingRule;
 import com.delivery.deliveryapi.model.User;
 import com.delivery.deliveryapi.repo.DeliveryPricingRuleRepository;
 
@@ -224,7 +225,7 @@ class DeliveryPricingServiceTest {
     @Test
     void testCalculateDeliveryFeeWithCustomFee() {
         // Given
-        CreateDeliveryRequest request = new CreateDeliveryRequest();
+        PriceCalculationRequest request = new PriceCalculationRequest();
         request.setDeliveryFee(BigDecimal.valueOf(5.00));
 
         // When
@@ -241,7 +242,7 @@ class DeliveryPricingServiceTest {
         CreateDeliveryRequest request = new CreateDeliveryRequest();
         request.setDeliveryProvince("Phnom Penh");
         request.setDeliveryDistrict("Chamkarmon");
-        request.setEstimatedValue(BigDecimal.valueOf(50));
+        // estimated value not required for batch-level calculation
 
         DeliveryPricingRule rule = new DeliveryPricingRule(testCompany, "Phnom Penh Rule", BigDecimal.valueOf(2.00));
         rule.setProvince("Phnom Penh");
@@ -261,7 +262,7 @@ class DeliveryPricingServiceTest {
     @Test
     void testCalculateDeliveryFeeWithHighValueSurcharge() {
         // Given
-        CreateDeliveryRequest request = new CreateDeliveryRequest();
+        PriceCalculationRequest request = new PriceCalculationRequest();
         request.setDeliveryProvince("Phnom Penh");
         request.setEstimatedValue(BigDecimal.valueOf(150)); // Above threshold
 
@@ -285,7 +286,7 @@ class DeliveryPricingServiceTest {
         CreateDeliveryRequest request = new CreateDeliveryRequest();
         request.setPickupProvince("Phnom Penh");
         request.setDeliveryProvince("Phnom Penh");
-        request.setEstimatedValue(BigDecimal.valueOf(50));
+        // batch-level request: no item estimatedValue on request
 
         when(pricingRuleRepository.findApplicableRules(testCompany, "Phnom Penh", null))
             .thenReturn(Arrays.asList());
@@ -303,7 +304,7 @@ class DeliveryPricingServiceTest {
         CreateDeliveryRequest request = new CreateDeliveryRequest();
         request.setPickupProvince("Kandal");
         request.setDeliveryProvince("Phnom Penh");
-        request.setEstimatedValue(BigDecimal.valueOf(50));
+        // batch-level request: no item estimatedValue on request
 
         when(pricingRuleRepository.findApplicableRules(testCompany, "Phnom Penh", null))
             .thenReturn(Arrays.asList());
@@ -318,7 +319,7 @@ class DeliveryPricingServiceTest {
     @Test
     void testCalculateDeliveryFeeFreeModel() {
         // Given
-        CreateDeliveryRequest request = new CreateDeliveryRequest();
+        PriceCalculationRequest request = new PriceCalculationRequest();
         request.setDeliveryFeeModel("FREE");
 
         when(pricingRuleRepository.findApplicableRules(testCompany, null, null))

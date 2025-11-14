@@ -2,6 +2,7 @@ package com.delivery.deliveryapi.service;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -10,14 +11,17 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.MockitoAnnotations;
 
 import com.delivery.deliveryapi.controller.DeliveryController.CreateDeliveryRequest;
+import com.delivery.deliveryapi.controller.DeliveryController.DeliveryItemPayload;
 import com.delivery.deliveryapi.model.Company;
 import com.delivery.deliveryapi.model.DeliveryItem;
 import com.delivery.deliveryapi.model.District;
@@ -47,6 +51,9 @@ class DeliveryServiceTest {
     private DeliveryPhotoRepository deliveryPhotoRepository;
 
     @Mock
+    private com.delivery.deliveryapi.repo.DeliveryPackageRepository deliveryPackageRepository;
+
+    @Mock
     private DeliveryPricingService deliveryPricingService;
 
     @Mock
@@ -58,6 +65,15 @@ class DeliveryServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        // Common stubs used by delivery creation tests
+        when(deliveryPackageRepository.save(any(com.delivery.deliveryapi.model.DeliveryPackage.class))).thenAnswer(inv -> {
+            com.delivery.deliveryapi.model.DeliveryPackage p = inv.getArgument(0);
+            p.setId(UUID.randomUUID());
+            return p;
+        });
+        when(productRepository.searchProductsByName(any(), anyString())).thenReturn(java.util.List.of());
+        when(productService.createProductFromDelivery(any(), anyString(), any(), any())).thenReturn(new com.delivery.deliveryapi.model.Product());
+        doNothing().when(productRepository).flush();
     }
 
     @Test
@@ -99,7 +115,10 @@ class DeliveryServiceTest {
         request.setDeliveryType("COMPANY");
         request.setCompanyName("Test Company");
         request.setCompanyPhone("021234567");
-        request.setItemDescription("Test Item");
+        DeliveryItemPayload payload = new DeliveryItemPayload();
+        payload.setItemDescription("Test Item");
+        payload.setEstimatedValue(BigDecimal.valueOf(1000));
+        request.setItems(List.of(payload));
         // Pickup fields are null - should auto-populate from sender
         request.setPickupAddress(null);
         request.setPickupProvince(null);
@@ -107,7 +126,6 @@ class DeliveryServiceTest {
         request.setDeliveryAddress("456 Delivery St");
         request.setDeliveryProvince("Bangkok");
         request.setDeliveryDistrict("Sukhumvit");
-        request.setEstimatedValue(BigDecimal.valueOf(1000));
 
         DeliveryItem savedDelivery = new DeliveryItem();
         savedDelivery.setId(UUID.randomUUID());
@@ -170,7 +188,10 @@ class DeliveryServiceTest {
         request.setDeliveryType("COMPANY");
         request.setCompanyName("Test Company");
         request.setCompanyPhone("021234567");
-        request.setItemDescription("Test Item");
+        DeliveryItemPayload payload = new DeliveryItemPayload();
+        payload.setItemDescription("Test Item");
+        payload.setEstimatedValue(BigDecimal.valueOf(1000));
+        request.setItems(List.of(payload));
         // Pickup fields provided in request - should use these instead of sender's
         request.setPickupAddress("789 Pickup St");
         request.setPickupProvince("Chiang Mai");
@@ -178,7 +199,6 @@ class DeliveryServiceTest {
         request.setDeliveryAddress("456 Delivery St");
         request.setDeliveryProvince("Bangkok");
         request.setDeliveryDistrict("Sukhumvit");
-        request.setEstimatedValue(BigDecimal.valueOf(1000));
 
         DeliveryItem savedDelivery = new DeliveryItem();
         savedDelivery.setId(UUID.randomUUID());
