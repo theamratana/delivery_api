@@ -26,6 +26,9 @@ public interface DeliveryItemRepository extends JpaRepository<DeliveryItem, UUID
     @Query("SELECT d FROM DeliveryItem d WHERE d.sender = :user OR d.receiver = :user OR d.deliveryDriver = :user AND d.deleted = false ORDER BY d.createdAt DESC")
     List<DeliveryItem> findByUserInvolved(@Param("user") User user);
 
+    @Query("SELECT d FROM DeliveryItem d WHERE d.receiver IS NOT NULL AND d.receiver.phoneE164 = :phone AND d.deleted = false ORDER BY d.updatedAt DESC")
+    List<DeliveryItem> findByReceiverPhone(@Param("phone") String phone);
+
     long countBySenderIdAndDeletedFalse(UUID senderId);
 
     long countByStatusAndDeletedFalse(DeliveryStatus status);

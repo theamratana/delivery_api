@@ -12,13 +12,13 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Transient;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
 @Table(name = "users",
@@ -52,7 +52,6 @@ public class User {
     @Column(name = "avatar_url", length = 512)
     private String avatarUrl;
 
-    // Legacy single phone field; not unique anymore since multi-phone support exists
     @Column(name = "phone_e164")
     private String phoneE164;
 

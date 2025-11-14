@@ -78,19 +78,17 @@ public class DeliveryPricingService {
     }
 
     public BigDecimal calculateDeliveryFee(User user, CreateDeliveryRequest request) {
-        // If user specified a custom fee, use it
-        if (request.getDeliveryFee() != null) {
-            return request.getDeliveryFee();
-        }
-
+        // For batch requests, calculate default fee for the destination
+        // Individual item fees can override this if specified in the item payload
+        
         // Find applicable pricing rules for the delivery location
         List<DeliveryPricingRule> applicableRules = pricingRuleRepository
             .findApplicableRules(user.getCompany(), request.getDeliveryProvince(), request.getDeliveryDistrict());
 
         if (!applicableRules.isEmpty()) {
-            // Use the highest priority rule
+            // Use the highest priority rule with default item value
             DeliveryPricingRule rule = applicableRules.get(0);
-            return calculateFeeFromRule(rule, request.getEstimatedValue());
+            return calculateFeeFromRule(rule, null); // No specific item value at batch level
         }
 
         // Fallback to default calculation if no rules found
@@ -130,7 +128,7 @@ public class DeliveryPricingService {
     }
 
     private BigDecimal calculateDefaultFee(CreateDeliveryRequest request) {
-        // Default calculation (same as before)
+        // Default calculation based on location
         BigDecimal baseFee = BigDecimal.valueOf(2.00);
 
         // Geographic multiplier
@@ -140,18 +138,7 @@ public class DeliveryPricingService {
             locationMultiplier = BigDecimal.valueOf(1.5);
         }
 
-        // High-value item surcharge
-        if (request.getEstimatedValue() != null && request.getEstimatedValue().compareTo(BigDecimal.valueOf(100)) > 0) {
-            baseFee = baseFee.add(BigDecimal.valueOf(1.00));
-        }
-
         BigDecimal calculatedFee = baseFee.multiply(locationMultiplier);
-
-        // Apply delivery fee model adjustments
-        if ("FREE".equalsIgnoreCase(request.getDeliveryFeeModel())) {
-            calculatedFee = BigDecimal.ZERO;
-        }
-
         return calculatedFee.setScale(2, java.math.RoundingMode.HALF_UP);
     }
 

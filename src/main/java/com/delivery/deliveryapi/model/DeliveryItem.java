@@ -14,6 +14,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Table(name = "delivery_items",
@@ -28,6 +29,7 @@ import jakarta.persistence.Table;
         @Index(name = "idx_delivery_items_deleted_at", columnList = "deleted_at")
     }
 )
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class DeliveryItem extends AuditableEntity {
 
     @Id
@@ -56,6 +58,10 @@ public class DeliveryItem extends AuditableEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private DeliveryStatus status = DeliveryStatus.CREATED;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", nullable = false)
+    private PaymentMethod paymentMethod = PaymentMethod.COD;
 
     @Column(name = "estimated_delivery_time")
     private OffsetDateTime estimatedDeliveryTime;
@@ -95,6 +101,9 @@ public class DeliveryItem extends AuditableEntity {
 
     @Column(name = "item_value", precision = 10, scale = 2)
     private BigDecimal itemValue;
+
+    @Column(name = "quantity", nullable = false)
+    private Integer quantity = 1; // Product quantity (default 1)
 
     @Column(name = "currency", length = 3)
     private String currency = "USD";
@@ -154,6 +163,9 @@ public class DeliveryItem extends AuditableEntity {
     public DeliveryStatus getStatus() { return status; }
     public void setStatus(DeliveryStatus status) { this.status = status; }
 
+    public PaymentMethod getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(PaymentMethod paymentMethod) { this.paymentMethod = paymentMethod; }
+
     public OffsetDateTime getEstimatedDeliveryTime() { return estimatedDeliveryTime; }
     public void setEstimatedDeliveryTime(OffsetDateTime estimatedDeliveryTime) { this.estimatedDeliveryTime = estimatedDeliveryTime; }
 
@@ -192,6 +204,9 @@ public class DeliveryItem extends AuditableEntity {
 
     public BigDecimal getItemValue() { return itemValue; }
     public void setItemValue(BigDecimal itemValue) { this.itemValue = itemValue; }
+
+    public Integer getQuantity() { return quantity != null ? quantity : 1; }
+    public void setQuantity(Integer quantity) { this.quantity = quantity != null && quantity > 0 ? quantity : 1; }
 
     public String getCurrency() { return currency; }
     public void setCurrency(String currency) { this.currency = currency; }

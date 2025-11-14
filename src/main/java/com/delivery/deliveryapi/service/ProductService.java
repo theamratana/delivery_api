@@ -90,6 +90,22 @@ public class ProductService {
         return product;
     }
 
+    public Product getProductById(UUID productId, User user) {
+        Optional<Product> product = productRepository.findById(productId);
+        if (product.isEmpty()) {
+            throw new IllegalArgumentException("Product not found");
+        }
+        
+        Product foundProduct = product.get();
+        
+        // Verify user has access to this product (same company)
+        if (user.getCompany() == null || !foundProduct.getCompany().getId().equals(user.getCompany().getId())) {
+            throw new IllegalArgumentException("Access denied to this product");
+        }
+        
+        return foundProduct;
+    }
+
     public List<Product> getCompanyProducts(User user) {
         if (user.getCompany() == null) {
             return List.of();
@@ -104,12 +120,22 @@ public class ProductService {
         return productRepository.searchProductsByName(user.getCompany().getId(), searchTerm);
     }
 
-    public List<Product> getAllProducts() {
-        return productRepository.findByIsActiveTrueOrderByCreatedAtDesc();
+    public List<Product> getProductSuggestions(User user, String query) {
+        if (user.getCompany() == null) {
+            return List.of();
+        }
+        if (query == null || query.trim().isEmpty()) {
+            return List.of();
+        }
+        return productRepository.findSuggestionsByName(user.getCompany().getId(), query.trim());
     }
 
     public List<Product> searchAllProducts(String searchTerm) {
         return productRepository.searchProductsByNameAll(searchTerm);
+    }
+
+    public List<Product> getAllProducts() {
+        return productRepository.findByIsActiveTrueOrderByCreatedAtDesc();
     }
 
     @Transactional

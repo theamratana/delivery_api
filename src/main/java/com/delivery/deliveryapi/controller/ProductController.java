@@ -2,10 +2,12 @@ package com.delivery.deliveryapi.controller;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,10 +17,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.delivery.deliveryapi.dto.ProductDTO;
 import com.delivery.deliveryapi.model.Product;
 import com.delivery.deliveryapi.model.ProductCategory;
 import com.delivery.deliveryapi.model.User;
-import com.delivery.deliveryapi.model.UserRole;
 import com.delivery.deliveryapi.repo.UserRepository;
 import com.delivery.deliveryapi.service.ProductService;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -36,20 +38,10 @@ public class ProductController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Product>> getCompanyProducts(@RequestParam(required = false) String search) {
+    @Transactional
+    public ResponseEntity<List<ProductDTO>> getCompanyProducts(@RequestParam(required = false) String search) {
         try {
             User currentUser = getCurrentUser();
-
-            // System administrators can see all products
-            if (currentUser.getUserRole() == UserRole.SYSTEM_ADMINISTRATOR) {
-                List<Product> products;
-                if (search != null && !search.trim().isEmpty()) {
-                    products = productService.searchAllProducts(search.trim());
-                } else {
-                    products = productService.getAllProducts();
-                }
-                return ResponseEntity.ok(products);
-            }
 
             // Regular users see only their company's products
             List<Product> products;
@@ -59,19 +51,40 @@ public class ProductController {
                 products = productService.getCompanyProducts(currentUser);
             }
 
-            return ResponseEntity.ok(products);
+            List<ProductDTO> productDTOs = products.stream()
+                    .map(ProductDTO::fromProduct)
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(productDTOs);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(List.of());
         }
     }
 
-    @GetMapping("/most-used")
-    public ResponseEntity<List<Product>> getMostUsedProducts() {
+    @GetMapping("/{productId}")
+    @Transactional
+    public ResponseEntity<ProductDTO> getProduct(@PathVariable UUID productId) {
         try {
             User currentUser = getCurrentUser();
-            List<Product> products = productService.getCompanyProducts(currentUser);
-            return ResponseEntity.ok(products);
+            Product product = productService.getProductById(productId, currentUser);
+            return ResponseEntity.ok(ProductDTO.fromProduct(product));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+    @GetMapping("/suggestions")
+    public ResponseEntity<List<ProductDTO>> getProductSuggestions(@RequestParam String query) {
+        try {
+            User currentUser = getCurrentUser();
+            List<Product> suggestions = productService.getProductSuggestions(currentUser, query);
+            List<ProductDTO> suggestionDTOs = suggestions.stream()
+                    .map(ProductDTO::fromProduct)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(suggestionDTOs);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(List.of());

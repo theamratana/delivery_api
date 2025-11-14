@@ -2,6 +2,8 @@ package com.delivery.deliveryapi.model;
 
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -9,6 +11,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 @Entity
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Table(name = "provinces",
     indexes = {
         @Index(name = "idx_provinces_name", columnList = "name"),

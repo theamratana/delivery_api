@@ -2,6 +2,7 @@ package com.delivery.deliveryapi.service;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -55,7 +56,9 @@ public class DeliveryService {
 
     @Transactional
     public DeliveryItem createDelivery(User sender, CreateDeliveryRequest request) {
-        log.info("Creating delivery for sender: {} to receiver phone: {}", sender.getId(), request.getReceiverPhone());
+        log.info("Creating batch delivery for sender: {} to receiver phone: {} with {} items", 
+            sender.getId(), request.getReceiverPhone(), 
+            request.getItems() != null ? request.getItems().size() : 0);
 
         // Validate request
         validateCreateDeliveryRequest(request);
@@ -73,7 +76,7 @@ public class DeliveryService {
 
         if (DELIVERY_TYPE_COMPANY.equalsIgnoreCase(request.getDeliveryType())) {
             deliveryCompany = findOrCreateCompany(request.getCompanyName());
-            autoCreatedCompany = true; // All companies created here are auto-created
+            autoCreatedCompany = true;
             log.info("Using delivery company: {} ({})", deliveryCompany.getId(), deliveryCompany.getName());
         } else if (DELIVERY_TYPE_DRIVER.equalsIgnoreCase(request.getDeliveryType())) {
             deliveryDriver = findOrCreateDriver(request.getDriverPhone());
@@ -81,75 +84,159 @@ public class DeliveryService {
             log.info("Using delivery driver: {} ({})", deliveryDriver.getId(), deliveryDriver.getPhoneE164());
         }
 
-        // Calculate delivery fee using user's pricing rules
-        BigDecimal deliveryFee = deliveryPricingService.calculateDeliveryFee(sender, request);
+        // Auto-populate pickup information from sender's company if not provided
+        String pickupAddress = request.getPickupAddress();
+        String pickupProvince = request.getPickupProvince();
+        String pickupDistrict = request.getPickupDistrict();
 
-        // Handle product selection/creation
-        Product product = null;
-        boolean autoCreatedProduct = false;
+        if ((pickupAddress == null || pickupAddress.trim().isEmpty()) &&
+            sender.getCompany() != null && sender.getCompany().getAddress() != null && !sender.getCompany().getAddress().trim().isEmpty()) {
+            pickupAddress = sender.getCompany().getAddress();
+        }
+        if ((pickupProvince == null || pickupProvince.trim().isEmpty()) &&
+            sender.getCompany() != null && sender.getCompany().getDistrict() != null &&
+            sender.getCompany().getDistrict().getProvince() != null) {
+            pickupProvince = sender.getCompany().getDistrict().getProvince().getName();
+        }
+        if ((pickupDistrict == null || pickupDistrict.trim().isEmpty()) &&
+            sender.getCompany() != null && sender.getCompany().getDistrict() != null) {
+            pickupDistrict = sender.getCompany().getDistrict().getName();
+        }
 
-        if (Boolean.TRUE.equals(request.getUseExistingProduct()) && request.getProductId() != null) {
-            // Use existing product
-            Optional<Product> existingProduct = productRepository.findById(request.getProductId());
-            if (existingProduct.isPresent()) {
-                product = existingProduct.get();
-                // Check if user has access to this product (same company)
-                if (!product.getCompany().getId().equals(sender.getCompany().getId())) {
-                    throw new IllegalArgumentException("Access denied: Product belongs to different company");
+        // Calculate or use provided delivery fee (ONE FEE for entire delivery, all items)
+        BigDecimal deliveryFee = request.getDeliveryFee();
+        if (deliveryFee == null || deliveryFee.signum() <= 0) {
+            // Only calculate if fee not provided or invalid
+            deliveryFee = deliveryPricingService.calculateDeliveryFee(sender, request);
+            log.debug("Fee not provided, calculated: {}", deliveryFee);
+        } else {
+            log.debug("Using frontend-provided fee: {}", deliveryFee);
+        }
+
+        // Process each item in the batch and return the first one created
+        // (primary delivery item for response, all items share same receiver/company/driver/fee)
+        DeliveryItem firstDelivery = null;
+
+        for (int itemIndex = 0; itemIndex < request.getItems().size(); itemIndex++) {
+            var itemPayload = request.getItems().get(itemIndex);
+            log.info("Processing item {}/{}: productName={}, description={}", 
+                itemIndex + 1, request.getItems().size(), itemPayload.getProductName(), itemPayload.getItemDescription());
+
+            // Handle product selection/creation for this item
+            Product product = null;
+            boolean autoCreatedProduct = false;
+
+            if (itemPayload.getProductId() != null) {
+                // Use existing product by ID
+                Optional<Product> existingProduct = productRepository.findById(itemPayload.getProductId());
+                if (existingProduct.isPresent()) {
+                    product = existingProduct.get();
+                    if (!product.getCompany().getId().equals(sender.getCompany().getId())) {
+                        throw new IllegalArgumentException("Access denied: Product belongs to different company");
+                    }
+                    product.setUsageCount(product.getUsageCount() + 1);
+                    product.setLastUsedAt(OffsetDateTime.now());
+                    productRepository.save(product);
+                    log.info("Using existing product by ID: {}", product.getId());
+                } else {
+                    throw new IllegalArgumentException("Product not found: " + itemPayload.getProductId());
                 }
-                // Update usage statistics
-                product.setUsageCount(product.getUsageCount() + 1);
-                product.setLastUsedAt(OffsetDateTime.now());
-                productRepository.save(product);
-                log.info("Using existing product: {} for delivery", product.getId());
+            } else if (itemPayload.getProductName() != null && !itemPayload.getProductName().trim().isEmpty()) {
+                // PRIORITY 1: Search by product name (required field)
+                String searchName = itemPayload.getProductName().trim();
+                List<Product> existingProducts = productRepository.searchProductsByName(sender.getCompany().getId(), searchName);
+                
+                if (!existingProducts.isEmpty()) {
+                    // Found existing product with this name - reuse it
+                    product = existingProducts.get(0);
+                    product.setUsageCount(product.getUsageCount() + 1);
+                    product.setLastUsedAt(OffsetDateTime.now());
+                    productRepository.save(product);
+                    log.info("Reusing existing product by name '{}': {}", searchName, product.getId());
+                } else {
+                    // No existing product found - auto-create with product name
+                    product = productService.createProductFromDelivery(sender, 
+                        itemPayload.getProductName(), // Use productName as the product name
+                        itemPayload.getEstimatedValue(), deliveryFee);
+                    productRepository.flush(); // Ensure product is persisted immediately for next item search
+                    autoCreatedProduct = true;
+                    log.info("Created new product: {} (ID: {})", itemPayload.getProductName(), product.getId());
+                }
+            } else if (itemPayload.getItemDescription() != null && !itemPayload.getItemDescription().trim().isEmpty()) {
+                // FALLBACK: If productName is missing, use itemDescription for first creation
+                String fallbackName = itemPayload.getItemDescription().length() > 100 ? 
+                    itemPayload.getItemDescription().substring(0, 100) : itemPayload.getItemDescription();
+                
+                List<Product> existingProducts = productRepository.searchProductsByName(sender.getCompany().getId(), fallbackName);
+                if (!existingProducts.isEmpty()) {
+                    product = existingProducts.get(0);
+                    product.setUsageCount(product.getUsageCount() + 1);
+                    product.setLastUsedAt(OffsetDateTime.now());
+                    productRepository.save(product);
+                    log.info("Reusing existing product by description fallback: {}", product.getId());
+                } else {
+                    // Auto-create using description as fallback
+                    product = productService.createProductFromDelivery(sender, fallbackName, 
+                        itemPayload.getEstimatedValue(), deliveryFee);
+                    productRepository.flush(); // Ensure product is persisted immediately
+                    autoCreatedProduct = true;
+                    log.info("Created new product from description fallback: {} (ID: {})", fallbackName, product.getId());
+                }
             } else {
-                throw new IllegalArgumentException("Product not found");
+                throw new IllegalArgumentException("Item " + (itemIndex + 1) + ": productName or itemDescription is required");
             }
-        } else if (Boolean.TRUE.equals(request.getCreateProductFromDelivery())) {
-            // Create product from this delivery
-            product = productService.createProductFromDelivery(sender, request.getItemDescription(), request.getEstimatedValue(), deliveryFee);
-            autoCreatedProduct = true;
-            log.info("Auto-created product: {} from delivery", product.getId());
+
+            // Create delivery item for this product
+            DeliveryItem delivery = new DeliveryItem();
+            delivery.setSender(sender);
+            delivery.setReceiver(receiver);
+            delivery.setDeliveryCompany(deliveryCompany);
+            delivery.setDeliveryDriver(deliveryDriver);
+            delivery.setItemDescription(itemPayload.getItemDescription());
+            delivery.setPaymentMethod(com.delivery.deliveryapi.model.PaymentMethod.fromCode(
+                itemPayload.getPaymentMethod() != null ? itemPayload.getPaymentMethod() : request.getPaymentMethod()));
+
+            delivery.setPickupAddress(pickupAddress);
+            delivery.setPickupProvince(pickupProvince);
+            delivery.setPickupDistrict(pickupDistrict);
+
+            delivery.setDeliveryAddress(request.getDeliveryAddress());
+            delivery.setDeliveryProvince(request.getDeliveryProvince());
+            delivery.setDeliveryDistrict(request.getDeliveryDistrict());
+            delivery.setItemValue(itemPayload.getEstimatedValue());
+            delivery.setQuantity(itemPayload.getQuantity()); // Set product quantity from payload
+            
+            // All items share the SAME delivery fee (calculated once at batch level)
+            delivery.setDeliveryFee(deliveryFee);
+            delivery.setEstimatedDeliveryTime(OffsetDateTime.now().plusHours(2));
+
+            delivery.setProduct(product);
+            delivery.setAutoCreatedCompany(autoCreatedCompany);
+            delivery.setAutoCreatedDriver(autoCreatedDriver);
+            delivery.setAutoCreatedReceiver(autoCreatedReceiver && itemIndex == 0); // Only first item marks auto-created receiver
+            delivery.setAutoCreatedProduct(autoCreatedProduct);
+            delivery.setFeeAutoCalculated(true);
+
+            delivery = deliveryItemRepository.save(delivery);
+            log.info("Created delivery item {}/{}: {}", itemIndex + 1, request.getItems().size(), delivery.getId());
+
+            // Store first delivery for response
+            if (firstDelivery == null) {
+                firstDelivery = delivery;
+            }
+
+            // Create delivery photos for this item if provided
+            if (itemPayload.getItemPhotos() != null && !itemPayload.getItemPhotos().isEmpty()) {
+                for (int i = 0; i < itemPayload.getItemPhotos().size(); i++) {
+                    DeliveryPhoto photo = new DeliveryPhoto(delivery, itemPayload.getItemPhotos().get(i), i);
+                    deliveryPhotoRepository.save(photo);
+                }
+                log.info("Created {} photos for item {}", itemPayload.getItemPhotos().size(), itemIndex + 1);
+            }
         }
 
-        // Create delivery item
-        DeliveryItem delivery = new DeliveryItem();
-        delivery.setSender(sender);
-        delivery.setReceiver(receiver);
-        delivery.setDeliveryCompany(deliveryCompany);
-        delivery.setDeliveryDriver(deliveryDriver);
-        delivery.setItemDescription(request.getItemDescription());
-        delivery.setPickupAddress(request.getPickupAddress());
-        delivery.setPickupProvince(request.getPickupProvince());
-        delivery.setPickupDistrict(request.getPickupDistrict());
-        delivery.setDeliveryAddress(request.getDeliveryAddress());
-        delivery.setDeliveryProvince(request.getDeliveryProvince());
-        delivery.setDeliveryDistrict(request.getDeliveryDistrict());
-        delivery.setItemValue(request.getEstimatedValue());
-        delivery.setDeliveryFee(deliveryFee);
-        delivery.setEstimatedDeliveryTime(OffsetDateTime.now().plusHours(2)); // Default 2 hours
-
-        // Set product and auto-creation flags
-        delivery.setProduct(product);
-        delivery.setAutoCreatedCompany(autoCreatedCompany);
-        delivery.setAutoCreatedDriver(autoCreatedDriver);
-        delivery.setAutoCreatedReceiver(autoCreatedReceiver);
-        delivery.setAutoCreatedProduct(autoCreatedProduct);
-        delivery.setFeeAutoCalculated(true); // Fee is always auto-calculated
-
-        delivery = deliveryItemRepository.save(delivery);
-        log.info("Created delivery item: {}", delivery.getId());
-
-        // Create delivery photos if provided
-        if (request.getItemPhotos() != null && !request.getItemPhotos().isEmpty()) {
-            for (int i = 0; i < request.getItemPhotos().size(); i++) {
-                DeliveryPhoto photo = new DeliveryPhoto(delivery, request.getItemPhotos().get(i), i);
-                deliveryPhotoRepository.save(photo);
-            }
-            log.info("Created {} delivery photos", request.getItemPhotos().size());
-        }
-
-        return delivery;
+        log.info("Batch delivery creation completed with {} items", request.getItems().size());
+        return firstDelivery;
     }
 
     private void validateCreateDeliveryRequest(CreateDeliveryRequest request) {
@@ -161,18 +248,16 @@ public class DeliveryService {
         if (request.getReceiverPhone() == null || request.getReceiverPhone().trim().isEmpty()) {
             throw new IllegalArgumentException("Receiver phone is required");
         }
-        if (request.getItemDescription() == null || request.getItemDescription().trim().isEmpty()) {
-            throw new IllegalArgumentException("Item description is required");
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new IllegalArgumentException("At least one item is required");
         }
-        if (request.getPickupAddress() == null || request.getPickupAddress().trim().isEmpty()) {
-            throw new IllegalArgumentException("Pickup address is required");
+        for (int i = 0; i < request.getItems().size(); i++) {
+            var item = request.getItems().get(i);
+            if (item.getItemDescription() == null || item.getItemDescription().trim().isEmpty()) {
+                throw new IllegalArgumentException("Item " + (i + 1) + ": itemDescription is required");
+            }
         }
-        if (request.getPickupProvince() == null || request.getPickupProvince().trim().isEmpty()) {
-            throw new IllegalArgumentException("Pickup province is required");
-        }
-        if (request.getPickupDistrict() == null || request.getPickupDistrict().trim().isEmpty()) {
-            throw new IllegalArgumentException("Pickup district is required");
-        }
+        // Pickup fields are now optional - will be auto-populated from sender if not provided
         if (request.getDeliveryAddress() == null || request.getDeliveryAddress().trim().isEmpty()) {
             throw new IllegalArgumentException("Delivery address is required");
         }

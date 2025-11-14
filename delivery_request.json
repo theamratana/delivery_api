@@ -1,0 +1,13 @@
+{
+  "receiverPhone": "123456789",
+  "itemDescription": "Gaming Laptop",
+  "estimatedValue": 1500.00,
+  "pickupAddress": "123 Main St",
+  "pickupProvince": "Phnom Penh",
+  "pickupDistrict": "Chamkarmon",
+  "deliveryAddress": "456 Oak St",
+  "deliveryProvince": "Phnom Penh",
+  "deliveryDistrict": "Doun Penh",
+  "deliveryType": "DRIVER",
+  "driverPhone": "987654321"
+}

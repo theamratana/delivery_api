@@ -25,6 +25,9 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     List<Product> findByIsActiveTrueOrderByCreatedAtDesc();
 
-    @Query("SELECT p FROM Product p WHERE p.isActive = true AND LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) ORDER BY p.createdAt DESC")
+    @Query("SELECT p FROM Product p WHERE p.company.id = :companyId AND p.isActive = true AND LOWER(p.name) LIKE LOWER(CONCAT(:query, '%')) ORDER BY p.usageCount DESC, p.lastUsedAt DESC")
+    List<Product> findSuggestionsByName(@Param("companyId") UUID companyId, @Param("query") String query);
+
+    @Query("SELECT p FROM Product p WHERE p.isActive = true AND LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) ORDER BY p.usageCount DESC")
     List<Product> searchProductsByNameAll(@Param("searchTerm") String searchTerm);
 }
