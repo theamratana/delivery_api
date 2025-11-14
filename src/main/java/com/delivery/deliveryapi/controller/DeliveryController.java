@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,6 +41,7 @@ public class DeliveryController {
     private final DeliveryTrackingRepository deliveryTrackingRepository;
     private final DeliveryPhotoRepository deliveryPhotoRepository;
     private final UserRepository userRepository;
+    private final ObjectMapper objectMapper;
 
     public DeliveryController(DeliveryService deliveryService,
                             DeliveryItemRepository deliveryItemRepository,
@@ -51,10 +53,10 @@ public class DeliveryController {
         this.deliveryTrackingRepository = deliveryTrackingRepository;
         this.deliveryPhotoRepository = deliveryPhotoRepository;
         this.userRepository = userRepository;
+        this.objectMapper = new ObjectMapper();
     }
 
     @PostMapping
-    @Transactional
     public ResponseEntity<DeliveryResponse> createDelivery(@RequestBody CreateDeliveryRequest request) {
         try {
             // Get current user from security context
@@ -74,7 +76,7 @@ public class DeliveryController {
             }
             User currentUser = optUser.get();
 
-            // Create the delivery
+            // Create the delivery (service method is @Transactional)
             DeliveryItem delivery = deliveryService.createDelivery(currentUser, request);
 
             // Create initial tracking entry
@@ -90,8 +92,13 @@ public class DeliveryController {
             DeliveryResponse response = new DeliveryResponse(delivery);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
 
-        } catch (Exception e) {
+        } catch (IllegalArgumentException e) {
+            // Validation errors - return 400 with clear message
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new DeliveryResponse("Validation error: " + e.getMessage()));
+        } catch (Exception e) {
+            // Other errors - return 500 with message
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new DeliveryResponse("Error: " + e.getMessage()));
         }
     }
@@ -131,18 +138,30 @@ public class DeliveryController {
         }
         
         DeliveryItem item = optional.get();
-        // Get all items in the same batch (same receiver, address, province, district)
-        List<DeliveryItem> batchItems = deliveryItemRepository.findAll().stream()
-            .filter(d -> !d.isDeleted())
-            .filter(d -> {
-                User dReceiver = d.getReceiver();
-                User itemReceiver = item.getReceiver();
-                return (dReceiver != null && itemReceiver != null && dReceiver.getId().equals(itemReceiver.getId())) 
-                    && d.getDeliveryAddress().equals(item.getDeliveryAddress())
-                    && d.getDeliveryProvince().equals(item.getDeliveryProvince())
-                    && d.getDeliveryDistrict().equals(item.getDeliveryDistrict());
-            })
-            .toList();
+        List<DeliveryItem> batchItems;
+
+        // Prefer grouping by explicit batch id (created at POST time). Fall back to older
+        // receiver + address grouping when batch id is not present (backwards compatible).
+        if (item.getBatchId() != null) {
+            java.util.UUID batchUuid = item.getBatchId();
+            batchItems = deliveryItemRepository.findAll().stream()
+                .filter(d -> !d.isDeleted())
+                .filter(d -> batchUuid.equals(d.getBatchId()))
+                .toList();
+        } else {
+            // legacy behavior: group by receiver + address + province + district
+            batchItems = deliveryItemRepository.findAll().stream()
+                .filter(d -> !d.isDeleted())
+                .filter(d -> {
+                    User dReceiver = d.getReceiver();
+                    User itemReceiver = item.getReceiver();
+                    return (dReceiver != null && itemReceiver != null && dReceiver.getId().equals(itemReceiver.getId())) 
+                        && d.getDeliveryAddress().equals(item.getDeliveryAddress())
+                        && d.getDeliveryProvince().equals(item.getDeliveryProvince())
+                        && d.getDeliveryDistrict().equals(item.getDeliveryDistrict());
+                })
+                .toList();
+        }
         
         if (batchItems.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -151,7 +170,7 @@ public class DeliveryController {
         // Create batch from first item (all share same context)
         DeliveryItem first = batchItems.get(0);
         DeliveryBatchDTO batch = new DeliveryBatchDTO();
-        batch.setBatchId(first.getId().toString());
+        batch.setBatchId(first.getBatchId() != null ? first.getBatchId().toString() : first.getId().toString());
         
         User receiver = first.getReceiver();
         if (receiver != null) {
@@ -178,7 +197,7 @@ public class DeliveryController {
         }
         
         batch.setStatus(first.getStatus().toString());
-        batch.setPaymentMethod(first.getPaymentMethod().toString().toLowerCase());
+                batch.setPaymentMethod(first.getPaymentMethod().toString().toLowerCase());
         batch.setEstimatedDeliveryTime(first.getEstimatedDeliveryTime());
         batch.setCreatedAt(first.getCreatedAt());
         batch.setUpdatedAt(first.getUpdatedAt());
@@ -261,25 +280,30 @@ public class DeliveryController {
         java.util.Map<String, DeliveryBatchDTO> batches = new java.util.LinkedHashMap<>();
         
         for (DeliveryItem item : deliveries) {
-            // Create batch key from receiver and delivery location
-            String batchKey = String.format("%s|%s|%s|%s",
-                item.getReceiver() != null ? item.getReceiver().getId() : "unknown",
-                item.getDeliveryAddress() != null ? item.getDeliveryAddress() : "",
-                item.getDeliveryProvince() != null ? item.getDeliveryProvince() : "",
-                item.getDeliveryDistrict() != null ? item.getDeliveryDistrict() : ""
-            );
-            
+            // Prefer batch id grouping when present. Otherwise fall back to receiver/address grouping.
+            String batchKey;
+            if (item.getBatchId() != null) {
+                batchKey = "batch:" + item.getBatchId().toString();
+            } else {
+                batchKey = String.format("legacy:%s|%s|%s|%s",
+                    item.getReceiver() != null ? item.getReceiver().getId() : "unknown",
+                    item.getDeliveryAddress() != null ? item.getDeliveryAddress() : "",
+                    item.getDeliveryProvince() != null ? item.getDeliveryProvince() : "",
+                    item.getDeliveryDistrict() != null ? item.getDeliveryDistrict() : ""
+                );
+            }
+
             if (!batches.containsKey(batchKey)) {
                 // Create new batch
                 DeliveryBatchDTO batch = new DeliveryBatchDTO();
-                batch.setBatchId(item.getId().toString());
-                
+                batch.setBatchId(item.getBatchId() != null ? item.getBatchId().toString() : item.getId().toString());
+
                 if (item.getReceiver() != null) {
                     batch.setReceiverId(item.getReceiver().getId());
                     batch.setReceiverName(item.getReceiver().getDisplayName());
                     batch.setReceiverPhone(item.getReceiver().getPhoneE164());
                 }
-                
+
                 batch.setDeliveryAddress(item.getDeliveryAddress());
                 batch.setDeliveryProvince(item.getDeliveryProvince());
                 batch.setDeliveryDistrict(item.getDeliveryDistrict());
@@ -289,20 +313,20 @@ public class DeliveryController {
                 batch.setEstimatedDeliveryTime(item.getEstimatedDeliveryTime());
                 batch.setCreatedAt(item.getCreatedAt());
                 batch.setUpdatedAt(item.getUpdatedAt());
-                
+
                 if (item.getDeliveryCompany() != null) {
                     batch.setDeliveryCompanyId(item.getDeliveryCompany().getId());
                     batch.setDeliveryCompanyName(item.getDeliveryCompany().getName());
                 }
-                
+
                 if (item.getDeliveryDriver() != null) {
                     batch.setDeliveryDriverId(item.getDeliveryDriver().getId());
                     batch.setDeliveryDriverName(item.getDeliveryDriver().getDisplayName());
                 }
-                
+
                 batches.put(batchKey, batch);
             }
-            
+
             // Add item to batch
             DeliveryBatchDTO batch = batches.get(batchKey);
             batch.getItems().add(new DeliveryBatchDTO.DeliveryBatchItemDTO(
@@ -319,6 +343,100 @@ public class DeliveryController {
         batches.values().forEach(batch -> batch.setItemCount(batch.getItems().size()));
         
         return ResponseEntity.ok(new java.util.ArrayList<>(batches.values()));
+    }
+
+    @PostMapping("/{batchId}/items")
+    @Transactional
+    public ResponseEntity<?> appendItemsToBatch(@PathVariable String batchId, @RequestBody Object rawPayload) {
+        try {
+            var auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            java.util.UUID userId;
+            try {
+                userId = java.util.UUID.fromString(userIdStr);
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            var optUser = userRepository.findById(userId);
+            if (optUser.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            User currentUser = optUser.get();
+
+            // Normalize incoming payload: accept either a JSON array or an object with { items: [...] }
+            List<DeliveryItemPayload> items;
+            if (rawPayload instanceof List) {
+                items = ((List<?>) rawPayload).stream()
+                    .map(o -> objectMapper.convertValue(o, DeliveryItemPayload.class))
+                    .toList();
+            } else if (rawPayload instanceof java.util.Map) {
+                Object inner = ((java.util.Map<?,?>) rawPayload).get("items");
+                if (inner instanceof List) {
+                    items = ((List<?>) inner).stream()
+                        .map(o -> objectMapper.convertValue(o, DeliveryItemPayload.class))
+                        .toList();
+                } else {
+                    return ResponseEntity.badRequest().body(new DeliveryResponse("Invalid payload: 'items' must be an array"));
+                }
+            } else {
+                return ResponseEntity.badRequest().body(new DeliveryResponse("Invalid payload: expected array or object with 'items'"));
+            }
+
+            java.util.UUID bid = java.util.UUID.fromString(batchId);
+            java.util.List<com.delivery.deliveryapi.model.DeliveryItem> created = deliveryService.appendItemsToBatch(currentUser, bid, items);
+
+            // Create tracking entries for appended items
+            for (com.delivery.deliveryapi.model.DeliveryItem it : created) {
+                DeliveryTracking tracking = new DeliveryTracking(it, DeliveryStatus.CREATED, "Item appended to batch", currentUser);
+                deliveryTrackingRepository.save(tracking);
+            }
+
+            // Build and return updated batch DTO
+            java.util.List<com.delivery.deliveryapi.model.DeliveryItem> batchItems = deliveryItemRepository.findByBatchId(bid);
+            if (batchItems == null || batchItems.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            com.delivery.deliveryapi.model.DeliveryItem first = batchItems.get(0);
+            DeliveryBatchDTO batch = new DeliveryBatchDTO();
+            batch.setBatchId(first.getBatchId() != null ? first.getBatchId().toString() : first.getId().toString());
+            if (first.getReceiver() != null) {
+                batch.setReceiverId(first.getReceiver().getId());
+                batch.setReceiverName(first.getReceiver().getDisplayName());
+                batch.setReceiverPhone(first.getReceiver().getPhoneE164());
+            }
+            batch.setDeliveryAddress(first.getDeliveryAddress());
+            batch.setDeliveryProvince(first.getDeliveryProvince());
+            batch.setDeliveryDistrict(first.getDeliveryDistrict());
+            batch.setDeliveryFee(first.getDeliveryFee());
+            batch.setStatus(first.getStatus().toString());
+            batch.setPaymentMethod(first.getPaymentMethod() != null ? first.getPaymentMethod().getCode() : "COD");
+            batch.setEstimatedDeliveryTime(first.getEstimatedDeliveryTime());
+            batch.setCreatedAt(first.getCreatedAt());
+            batch.setUpdatedAt(first.getUpdatedAt());
+
+            if (first.getDeliveryCompany() != null) {
+                batch.setDeliveryCompanyId(first.getDeliveryCompany().getId());
+                batch.setDeliveryCompanyName(first.getDeliveryCompany().getName());
+            }
+            if (first.getDeliveryDriver() != null) {
+                batch.setDeliveryDriverId(first.getDeliveryDriver().getId());
+                batch.setDeliveryDriverName(first.getDeliveryDriver().getDisplayName());
+            }
+
+            java.util.List<DeliveryBatchDTO.DeliveryBatchItemDTO> dtoItems = batchItems.stream()
+                .map(d -> new DeliveryBatchDTO.DeliveryBatchItemDTO(
+                    d.getId(), d.getItemDescription(), d.getQuantity(), d.getItemValue(), d.getProduct() != null ? d.getProduct().getId() : null, d.getStatus().toString()))
+                .toList();
+            batch.setItems(dtoItems);
+            batch.setItemCount(dtoItems.size());
+
+            return ResponseEntity.ok(batch);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new DeliveryResponse("Error: " + e.getMessage()));
+        }
     }
 
     // Request/Response DTOs
@@ -476,6 +594,9 @@ public class DeliveryController {
         @JsonProperty("deliveryId")
         private UUID deliveryId;
 
+        @JsonProperty("batchId")
+        private UUID batchId;
+
         @JsonProperty("status")
         private String status;
 
@@ -494,6 +615,7 @@ public class DeliveryController {
             this.trackingCode = "DEL" + delivery.getId().toString().substring(0, 8).toUpperCase();
             this.estimatedDelivery = delivery.getEstimatedDeliveryTime() != null ?
                     delivery.getEstimatedDeliveryTime().toString() : null;
+            this.batchId = delivery.getBatchId();
         }
 
         public DeliveryResponse(String error) {
@@ -503,6 +625,9 @@ public class DeliveryController {
         // Getters and setters
         public UUID getDeliveryId() { return deliveryId; }
         public void setDeliveryId(UUID deliveryId) { this.deliveryId = deliveryId; }
+
+        public UUID getBatchId() { return batchId; }
+        public void setBatchId(UUID batchId) { this.batchId = batchId; }
 
         public String getStatus() { return status; }
         public void setStatus(String status) { this.status = status; }
