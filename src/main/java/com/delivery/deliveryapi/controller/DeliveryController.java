@@ -9,7 +9,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,11 +16,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.delivery.deliveryapi.dto.DeliveryItemDTO;
 import com.delivery.deliveryapi.dto.DeliveryBatchDTO;
+import com.delivery.deliveryapi.dto.DeliveryItemDTO;
 import com.delivery.deliveryapi.dto.ReceiverSuggestion;
 import com.delivery.deliveryapi.model.Company;
 import com.delivery.deliveryapi.model.DeliveryItem;
+import com.delivery.deliveryapi.model.DeliveryPhoto;
 import com.delivery.deliveryapi.model.DeliveryStatus;
 import com.delivery.deliveryapi.model.DeliveryTracking;
 import com.delivery.deliveryapi.model.User;
@@ -31,6 +31,7 @@ import com.delivery.deliveryapi.repo.DeliveryTrackingRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
 import com.delivery.deliveryapi.service.DeliveryService;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @RestController
 @RequestMapping("/deliveries")
@@ -204,14 +205,24 @@ public class DeliveryController {
         
         // Add all items to batch
         List<DeliveryBatchDTO.DeliveryBatchItemDTO> items = batchItems.stream()
-            .map(d -> new DeliveryBatchDTO.DeliveryBatchItemDTO(
-                d.getId(),
-                d.getItemDescription(),
-                d.getQuantity() != null ? d.getQuantity() : 1,
-                d.getItemValue(),
-                d.getProduct() != null ? d.getProduct().getId() : null,
-                d.getStatus().toString()
-            ))
+            .map(d -> {
+                // Fetch photos from delivery_photos table instead of parsing JSON field
+                List<String> itemPhotos = deliveryPhotoRepository
+                    .findByDeliveryItemIdAndDeletedFalseOrderBySequenceOrderAsc(d.getId())
+                    .stream()
+                    .map(DeliveryPhoto::getPhotoUrl)
+                    .toList();
+                
+                return new DeliveryBatchDTO.DeliveryBatchItemDTO(
+                    d.getId(),
+                    d.getItemDescription(),
+                    d.getQuantity() != null ? d.getQuantity() : 1,
+                    d.getItemValue(),
+                    d.getProduct() != null ? d.getProduct().getId() : null,
+                    d.getStatus().toString(),
+                    itemPhotos
+                );
+            })
             .toList();
         batch.setItems(items);
         batch.setItemCount(items.size());
@@ -329,13 +340,20 @@ public class DeliveryController {
 
             // Add item to batch
             DeliveryBatchDTO batch = batches.get(batchKey);
+            // Fetch photos from delivery_photos table instead of parsing JSON field
+            List<String> itemPhotos = deliveryPhotoRepository
+                .findByDeliveryItemIdAndDeletedFalseOrderBySequenceOrderAsc(item.getId())
+                .stream()
+                .map(DeliveryPhoto::getPhotoUrl)
+                .toList();
             batch.getItems().add(new DeliveryBatchDTO.DeliveryBatchItemDTO(
                 item.getId(),
                 item.getItemDescription(),
                 item.getQuantity(),
                 item.getItemValue(),
                 item.getProduct() != null ? item.getProduct().getId() : null,
-                item.getStatus().toString()
+                item.getStatus().toString(),
+                itemPhotos
             ));
         }
         
@@ -427,8 +445,16 @@ public class DeliveryController {
             }
 
             java.util.List<DeliveryBatchDTO.DeliveryBatchItemDTO> dtoItems = batchItems.stream()
-                .map(d -> new DeliveryBatchDTO.DeliveryBatchItemDTO(
-                    d.getId(), d.getItemDescription(), d.getQuantity(), d.getItemValue(), d.getProduct() != null ? d.getProduct().getId() : null, d.getStatus().toString()))
+                .map(d -> {
+                    // Fetch photos from delivery_photos table instead of parsing JSON field
+                    List<String> itemPhotos = deliveryPhotoRepository
+                        .findByDeliveryItemIdAndDeletedFalseOrderBySequenceOrderAsc(d.getId())
+                        .stream()
+                        .map(DeliveryPhoto::getPhotoUrl)
+                        .toList();
+                    return new DeliveryBatchDTO.DeliveryBatchItemDTO(
+                        d.getId(), d.getItemDescription(), d.getQuantity(), d.getItemValue(), d.getProduct() != null ? d.getProduct().getId() : null, d.getStatus().toString(), itemPhotos);
+                })
                 .toList();
             batch.setItems(dtoItems);
             batch.setItemCount(dtoItems.size());

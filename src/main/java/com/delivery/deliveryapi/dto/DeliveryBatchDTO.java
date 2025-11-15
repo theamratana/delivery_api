@@ -151,6 +151,9 @@ public class DeliveryBatchDTO {
         @JsonProperty("status")
         private String status;
 
+        @JsonProperty("itemPhotos")
+        private List<String> itemPhotos;
+
         public DeliveryBatchItemDTO() {}
 
         public DeliveryBatchItemDTO(UUID itemId, String itemDescription, Integer quantity, BigDecimal itemValue, UUID productId, String status) {
@@ -160,6 +163,16 @@ public class DeliveryBatchDTO {
             this.itemValue = itemValue;
             this.productId = productId;
             this.status = status;
+        }
+
+        public DeliveryBatchItemDTO(UUID itemId, String itemDescription, Integer quantity, BigDecimal itemValue, UUID productId, String status, List<String> itemPhotos) {
+            this.itemId = itemId;
+            this.itemDescription = itemDescription;
+            this.quantity = quantity;
+            this.itemValue = itemValue;
+            this.productId = productId;
+            this.status = status;
+            this.itemPhotos = itemPhotos;
         }
 
         // Getters and setters
@@ -180,5 +193,8 @@ public class DeliveryBatchDTO {
 
         public String getStatus() { return status; }
         public void setStatus(String status) { this.status = status; }
+
+        public List<String> getItemPhotos() { return itemPhotos; }
+        public void setItemPhotos(List<String> itemPhotos) { this.itemPhotos = itemPhotos; }
     }
 }
