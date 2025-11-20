@@ -47,6 +47,12 @@ public class Product extends AuditableEntity {
 
     @Column(name = "default_price", precision = 10, scale = 2)
     private BigDecimal defaultPrice;
+    
+    @Column(name = "buying_price", precision = 10, scale = 2)
+    private BigDecimal buyingPrice = java.math.BigDecimal.ZERO;
+
+    @Column(name = "selling_price", precision = 10, scale = 2)
+    private BigDecimal sellingPrice = java.math.BigDecimal.ZERO;
 
     @Column(name = "weight_kg", precision = 5, scale = 2)
     private BigDecimal weightKg;
@@ -56,6 +62,9 @@ public class Product extends AuditableEntity {
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
+
+    @Column(name = "is_published", nullable = false)
+    private Boolean isPublished = false;
 
     @Column(name = "usage_count", nullable = false)
     private Integer usageCount = 0;
@@ -92,6 +101,12 @@ public class Product extends AuditableEntity {
     public BigDecimal getDefaultPrice() { return defaultPrice; }
     public void setDefaultPrice(BigDecimal defaultPrice) { this.defaultPrice = defaultPrice; }
 
+    public BigDecimal getBuyingPrice() { return buyingPrice; }
+    public void setBuyingPrice(BigDecimal buyingPrice) { this.buyingPrice = buyingPrice; }
+
+    public BigDecimal getSellingPrice() { return sellingPrice; }
+    public void setSellingPrice(BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
+
     public BigDecimal getWeightKg() { return weightKg; }
     public void setWeightKg(BigDecimal weightKg) { this.weightKg = weightKg; }
 
@@ -106,4 +121,7 @@ public class Product extends AuditableEntity {
 
     public OffsetDateTime getLastUsedAt() { return lastUsedAt; }
     public void setLastUsedAt(OffsetDateTime lastUsedAt) { this.lastUsedAt = lastUsedAt; }
+
+    public Boolean getIsPublished() { return isPublished; }
+    public void setIsPublished(Boolean isPublished) { this.isPublished = isPublished; }
 }

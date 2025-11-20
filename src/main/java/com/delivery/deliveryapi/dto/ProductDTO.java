@@ -27,6 +27,15 @@ public class ProductDTO {
     @JsonProperty("defaultPrice")
     private BigDecimal defaultPrice;
     
+    @JsonProperty("buyingPrice")
+    private BigDecimal buyingPrice;
+    
+    @JsonProperty("sellingPrice")
+    private BigDecimal sellingPrice;
+    
+    @JsonProperty("isPublished")
+    private Boolean isPublished;
+    
     @JsonProperty("weightKg")
     private BigDecimal weightKg;
     
@@ -56,6 +65,9 @@ public class ProductDTO {
         dto.setName(product.getName());
         dto.setDescription(product.getDescription());
         dto.setDefaultPrice(product.getDefaultPrice());
+        dto.setBuyingPrice(product.getBuyingPrice());
+        dto.setSellingPrice(product.getSellingPrice());
+        dto.setIsPublished(product.getIsPublished());
         dto.setWeightKg(product.getWeightKg());
         dto.setDimensions(product.getDimensions());
         dto.setIsActive(product.getIsActive());
@@ -93,6 +105,15 @@ public class ProductDTO {
 
     public BigDecimal getDefaultPrice() { return defaultPrice; }
     public void setDefaultPrice(BigDecimal defaultPrice) { this.defaultPrice = defaultPrice; }
+
+    public BigDecimal getBuyingPrice() { return buyingPrice; }
+    public void setBuyingPrice(BigDecimal buyingPrice) { this.buyingPrice = buyingPrice; }
+
+    public BigDecimal getSellingPrice() { return sellingPrice; }
+    public void setSellingPrice(BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
+
+    public Boolean getIsPublished() { return isPublished; }
+    public void setIsPublished(Boolean isPublished) { this.isPublished = isPublished; }
 
     public BigDecimal getWeightKg() { return weightKg; }
     public void setWeightKg(BigDecimal weightKg) { this.weightKg = weightKg; }

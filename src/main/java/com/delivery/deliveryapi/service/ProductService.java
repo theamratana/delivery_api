@@ -140,7 +140,8 @@ public class ProductService {
 
     @Transactional
     public Product updateProduct(UUID productId, User user, String name, String description,
-                               ProductCategory category, BigDecimal defaultPrice) {
+                               ProductCategory category, BigDecimal defaultPrice,
+                               BigDecimal buyingPrice, BigDecimal sellingPrice, Boolean isPublished) {
         if (productId == null) {
             throw new IllegalArgumentException("Product ID is required");
         }
@@ -169,7 +170,36 @@ public class ProductService {
         if (defaultPrice != null) {
             product.setDefaultPrice(defaultPrice);
         }
+        if (buyingPrice != null) {
+            product.setBuyingPrice(buyingPrice);
+        }
+        if (sellingPrice != null) {
+            product.setSellingPrice(sellingPrice);
+        }
+        if (isPublished != null) {
+            product.setIsPublished(isPublished);
+        }
 
+        return productRepository.save(product);
+    }
+
+    @Transactional
+    public Product createProduct(User user, String name, String description,
+                                 ProductCategory category, BigDecimal defaultPrice,
+                                 BigDecimal buyingPrice, BigDecimal sellingPrice, Boolean isPublished) {
+        if (user.getCompany() == null) {
+            throw new IllegalArgumentException("User must belong to a company to create products");
+        }
+        Product product = new Product();
+        product.setCompany(user.getCompany());
+        product.setName(name != null ? name.trim() : null);
+        product.setDescription(description);
+        product.setCategory(category != null ? category : getDefaultCategory());
+        product.setDefaultPrice(defaultPrice != null ? defaultPrice : java.math.BigDecimal.ZERO);
+        product.setBuyingPrice(buyingPrice != null ? buyingPrice : java.math.BigDecimal.ZERO);
+        product.setSellingPrice(sellingPrice != null ? sellingPrice : java.math.BigDecimal.ZERO);
+        product.setIsPublished(isPublished != null ? isPublished : Boolean.FALSE);
+        product.setIsActive(true);
         return productRepository.save(product);
     }
 

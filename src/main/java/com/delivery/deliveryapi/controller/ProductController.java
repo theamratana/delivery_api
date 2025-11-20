@@ -96,9 +96,16 @@ public class ProductController {
                                                 @RequestBody UpdateProductRequest request) {
         try {
             User currentUser = getCurrentUser();
-            Product updatedProduct = productService.updateProduct(productId, currentUser,
+            var role = currentUser.getUserRole();
+            if (role == null || (role != com.delivery.deliveryapi.model.UserRole.OWNER
+                    && role != com.delivery.deliveryapi.model.UserRole.MANAGER
+                    && role != com.delivery.deliveryapi.model.UserRole.STAFF)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+            }
+                Product updatedProduct = productService.updateProduct(productId, currentUser,
                     request.getName(), request.getDescription(),
-                    request.getCategory(), request.getDefaultPrice());
+                    request.getCategory(), request.getDefaultPrice(),
+                    request.getBuyingPrice(), request.getSellingPrice(), request.getIsPublished());
             return ResponseEntity.ok(updatedProduct);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -109,10 +116,40 @@ public class ProductController {
         }
     }
 
+    @PostMapping
+    public ResponseEntity<ProductDTO> createProduct(@RequestBody CreateProductRequest request) {
+        try {
+            User currentUser = getCurrentUser();
+            // Only allow product creation for Owner/Manager/Staff
+            var role = currentUser.getUserRole();
+            if (role == null || (role != com.delivery.deliveryapi.model.UserRole.OWNER
+                    && role != com.delivery.deliveryapi.model.UserRole.MANAGER
+                    && role != com.delivery.deliveryapi.model.UserRole.STAFF)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+            if (currentUser.getCompany() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+            }
+            Product created = productService.createProduct(currentUser,
+                    request.getName(), request.getDescription(), request.getCategory(), request.getDefaultPrice(), request.getBuyingPrice(), request.getSellingPrice(), request.getIsPublished());
+            return ResponseEntity.status(HttpStatus.CREATED).body(ProductDTO.fromProduct(created));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
     @PostMapping("/{productId}/deactivate")
     public ResponseEntity<String> deactivateProduct(@PathVariable UUID productId) {
         try {
             User currentUser = getCurrentUser();
+            var role = currentUser.getUserRole();
+            if (role == null || (role != com.delivery.deliveryapi.model.UserRole.OWNER
+                    && role != com.delivery.deliveryapi.model.UserRole.MANAGER
+                    && role != com.delivery.deliveryapi.model.UserRole.STAFF)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Not authorized");
+            }
             productService.deactivateProduct(productId, currentUser);
             return ResponseEntity.ok("Product deactivated successfully");
         } catch (IllegalArgumentException e) {
@@ -157,6 +194,15 @@ public class ProductController {
 
         @JsonProperty("defaultPrice")
         private java.math.BigDecimal defaultPrice;
+        
+        @JsonProperty("buyingPrice")
+        private java.math.BigDecimal buyingPrice;
+
+        @JsonProperty("sellingPrice")
+        private java.math.BigDecimal sellingPrice;
+
+        @JsonProperty("isPublished")
+        private Boolean isPublished;
 
         // Getters and setters
         public String getName() { return name; }
@@ -170,5 +216,49 @@ public class ProductController {
 
         public java.math.BigDecimal getDefaultPrice() { return defaultPrice; }
         public void setDefaultPrice(java.math.BigDecimal defaultPrice) { this.defaultPrice = defaultPrice; }
+        public java.math.BigDecimal getBuyingPrice() { return buyingPrice; }
+        public void setBuyingPrice(java.math.BigDecimal buyingPrice) { this.buyingPrice = buyingPrice; }
+        public java.math.BigDecimal getSellingPrice() { return sellingPrice; }
+        public void setSellingPrice(java.math.BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
+        public Boolean getIsPublished() { return isPublished; }
+        public void setIsPublished(Boolean isPublished) { this.isPublished = isPublished; }
+    }
+
+    public static class CreateProductRequest {
+        @JsonProperty("name")
+        private String name;
+
+        @JsonProperty("description")
+        private String description;
+
+        @JsonProperty("category")
+        private ProductCategory category;
+
+        @JsonProperty("defaultPrice")
+        private java.math.BigDecimal defaultPrice;
+
+        @JsonProperty("buyingPrice")
+        private java.math.BigDecimal buyingPrice;
+
+        @JsonProperty("sellingPrice")
+        private java.math.BigDecimal sellingPrice;
+
+        @JsonProperty("isPublished")
+        private Boolean isPublished;
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
+        public ProductCategory getCategory() { return category; }
+        public void setCategory(ProductCategory category) { this.category = category; }
+        public java.math.BigDecimal getDefaultPrice() { return defaultPrice; }
+        public void setDefaultPrice(java.math.BigDecimal defaultPrice) { this.defaultPrice = defaultPrice; }
+        public java.math.BigDecimal getBuyingPrice() { return buyingPrice; }
+        public void setBuyingPrice(java.math.BigDecimal buyingPrice) { this.buyingPrice = buyingPrice; }
+        public java.math.BigDecimal getSellingPrice() { return sellingPrice; }
+        public void setSellingPrice(java.math.BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
+        public Boolean getIsPublished() { return isPublished; }
+        public void setIsPublished(Boolean isPublished) { this.isPublished = isPublished; }
     }
 }
