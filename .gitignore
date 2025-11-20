@@ -23,3 +23,6 @@ server_*.log
 *.iml
 *.class
 .env
+
+# Uploads
+uploads/images/

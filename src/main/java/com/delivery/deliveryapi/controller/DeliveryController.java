@@ -128,6 +128,77 @@ public class DeliveryController {
         return ResponseEntity.ok(dtos);
     }
 
+    @GetMapping("/batch/{batchId}")
+    public ResponseEntity<DeliveryBatchDTO> getDeliveryBatch(@PathVariable UUID batchId) {
+        // Find all items in this batch
+        List<DeliveryItem> batchItems = deliveryItemRepository.findByBatchId(batchId);
+        if (batchItems == null || batchItems.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        // Create batch from first item (all share same context)
+        DeliveryItem first = batchItems.get(0);
+        DeliveryBatchDTO batch = new DeliveryBatchDTO();
+        batch.setBatchId(first.getBatchId().toString());
+        
+        User receiver = first.getReceiver();
+        if (receiver != null) {
+            batch.setReceiverId(receiver.getId());
+            batch.setReceiverName(receiver.getDisplayName());
+            batch.setReceiverPhone(receiver.getPhoneE164());
+        }
+        
+        batch.setDeliveryAddress(first.getDeliveryAddress());
+        batch.setDeliveryProvince(first.getDeliveryProvince());
+        batch.setDeliveryDistrict(first.getDeliveryDistrict());
+        batch.setDeliveryFee(first.getDeliveryFee());
+        
+        Company company = first.getDeliveryCompany();
+        if (company != null) {
+            batch.setDeliveryCompanyId(company.getId());
+            batch.setDeliveryCompanyName(company.getName());
+        }
+        
+        User driver = first.getDeliveryDriver();
+        if (driver != null) {
+            batch.setDeliveryDriverId(driver.getId());
+            batch.setDeliveryDriverName(driver.getDisplayName());
+        }
+        
+        batch.setStatus(first.getStatus().toString());
+        batch.setPaymentMethod(first.getPaymentMethod().toString().toLowerCase());
+        batch.setEstimatedDeliveryTime(first.getEstimatedDeliveryTime());
+        batch.setCreatedAt(first.getCreatedAt());
+        batch.setUpdatedAt(first.getUpdatedAt());
+        
+        // Add all items to batch
+        List<DeliveryBatchDTO.DeliveryBatchItemDTO> items = batchItems.stream()
+            .filter(d -> !d.isDeleted())
+            .map(d -> {
+                // Fetch photos from delivery_photos table instead of parsing JSON field
+                List<String> itemPhotos = deliveryPhotoRepository
+                    .findByDeliveryItemIdAndDeletedFalseOrderBySequenceOrderAsc(d.getId())
+                    .stream()
+                    .map(DeliveryPhoto::getPhotoUrl)
+                    .toList();
+                
+                return new DeliveryBatchDTO.DeliveryBatchItemDTO(
+                    d.getId(),
+                    d.getItemDescription(),
+                    d.getQuantity() != null ? d.getQuantity() : 1,
+                    d.getItemValue(),
+                    d.getProduct() != null ? d.getProduct().getId() : null,
+                    d.getStatus().toString(),
+                    itemPhotos
+                );
+            })
+            .toList();
+        batch.setItems(items);
+        batch.setItemCount(items.size());
+        
+        return ResponseEntity.ok(batch);
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<DeliveryBatchDTO> getDelivery(@PathVariable UUID id) {
         // Find a delivery item with this ID to get batch context

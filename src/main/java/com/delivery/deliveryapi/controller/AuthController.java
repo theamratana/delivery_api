@@ -17,10 +17,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
 import com.delivery.deliveryapi.model.AuthIdentity;
 import com.delivery.deliveryapi.model.Company;
 import com.delivery.deliveryapi.model.Employee;
@@ -39,8 +39,9 @@ import com.delivery.deliveryapi.security.JwtService;
 import com.delivery.deliveryapi.service.AdminUserService;
 import com.delivery.deliveryapi.service.CompanyAssignmentService;
 import com.delivery.deliveryapi.service.TelegramAuthService;
-import io.jsonwebtoken.Claims;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
+import io.jsonwebtoken.Claims;
 
 @RestController
 @RequestMapping("/auth")
@@ -326,9 +327,9 @@ public class AuthController {
         ));
     }
 
-    public record ProfileUpdateRequest(UserType userType, String firstName, String lastName, String displayName, String companyName) {}
+    public record ProfileUpdateRequest(UserType userType, String firstName, String lastName, String displayName, String companyName, String avatarUrl) {}
 
-    public record ProfileResponse(UUID id, String displayName, String username, String firstName, String lastName, UserType userType, UserRole userRole, UUID companyId, String companyName, boolean incomplete) {}
+    public record ProfileResponse(UUID id, String displayName, String username, String firstName, String lastName, UserType userType, UserRole userRole, UUID companyId, String companyName, boolean incomplete, String avatarUrl, String phoneNumber) {}
 
     @GetMapping("/profile")
     @SuppressWarnings("null")
@@ -359,7 +360,9 @@ public class AuthController {
             user.getUserRole(),
             user.getCompany() != null ? user.getCompany().getId() : null,
             user.getCompany() != null ? user.getCompany().getName() : null,
-            user.isIncomplete()
+            user.isIncomplete(),
+            user.getAvatarUrl(),
+            user.getPhoneE164()
         ));
     }
 
@@ -389,12 +392,14 @@ public class AuthController {
         String oldLastName = user.getLastName();
         String oldDisplayName = user.getDisplayName();
         String oldCompanyName = user.getCompany() != null ? user.getCompany().getName() : null;
+        String oldAvatarUrl = user.getAvatarUrl();
 
         // Update fields (phone number updates are not allowed for security reasons)
         if (req.userType != null) user.setUserType(req.userType);
         if (req.firstName != null) user.setFirstName(req.firstName);
         if (req.lastName != null) user.setLastName(req.lastName);
         if (req.displayName != null) user.setDisplayName(req.displayName);
+        if (req.avatarUrl != null) user.setAvatarUrl(req.avatarUrl);
         // Note: phoneNumber updates are disabled for security - changing phone requires re-verification
 
         // Handle company
@@ -457,6 +462,7 @@ public class AuthController {
         auditUserChanges(userId, "lastName", oldLastName, req.lastName, AUDIT_TYPE_PROFILE_UPDATE);
         auditUserChanges(userId, "displayName", oldDisplayName, req.displayName, AUDIT_TYPE_PROFILE_UPDATE);
         auditUserChanges(userId, "companyName", oldCompanyName, req.companyName, AUDIT_TYPE_PROFILE_UPDATE);
+        auditUserChanges(userId, "avatarUrl", oldAvatarUrl, req.avatarUrl, AUDIT_TYPE_PROFILE_UPDATE);
         // Note: phoneNumber audit removed since phone updates are disabled
 
         return ResponseEntity.ok(Map.of("message", "Profile updated successfully"));
