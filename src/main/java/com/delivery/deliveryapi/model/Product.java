@@ -2,10 +2,13 @@ package com.delivery.deliveryapi.model;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -13,6 +16,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 
 @Entity
@@ -54,11 +59,18 @@ public class Product extends AuditableEntity {
     @Column(name = "selling_price", precision = 10, scale = 2)
     private BigDecimal sellingPrice = java.math.BigDecimal.ZERO;
 
+    @Column(name = "last_sell_price", precision = 10, scale = 2)
+    private BigDecimal lastSellPrice = java.math.BigDecimal.ZERO;
+
     @Column(name = "weight_kg", precision = 5, scale = 2)
     private BigDecimal weightKg;
 
     @Column(name = "dimensions", length = 50)
     private String dimensions; // e.g., "10x5x2cm"
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("photoIndex ASC")
+    private List<com.delivery.deliveryapi.model.ProductImage> productImages = new ArrayList<>();
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
@@ -107,11 +119,17 @@ public class Product extends AuditableEntity {
     public BigDecimal getSellingPrice() { return sellingPrice; }
     public void setSellingPrice(BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
 
+    public BigDecimal getLastSellPrice() { return lastSellPrice; }
+    public void setLastSellPrice(BigDecimal lastSellPrice) { this.lastSellPrice = lastSellPrice; }
+
     public BigDecimal getWeightKg() { return weightKg; }
     public void setWeightKg(BigDecimal weightKg) { this.weightKg = weightKg; }
 
     public String getDimensions() { return dimensions; }
     public void setDimensions(String dimensions) { this.dimensions = dimensions; }
+
+    public List<com.delivery.deliveryapi.model.ProductImage> getProductImages() { return productImages; }
+    public void setProductImages(List<com.delivery.deliveryapi.model.ProductImage> productImages) { this.productImages = productImages; }
 
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }

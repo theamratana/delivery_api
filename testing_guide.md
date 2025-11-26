@@ -76,6 +76,36 @@ curl -X PUT -H "Content-Type: application/json" \
 ```bash
 curl -X POST -H "Authorization: Bearer YOUR_TOKEN" \
   http://localhost:8081/api/products/{product-id}/deactivate
+
+### 3.5 Upload Image and Attach to Product
+1. Upload image(s):
+```bash
+curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -F "files=@/path/to/image.jpg" http://localhost:8081/api/images/upload
+```
+The response contains an object with `id` and `url` for each uploaded image. Use the `id` when referencing the image from `productPhotos`.
+
+2. Create or update product including `productPhotos` with image `id` or `url`:
+```bash
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"name":"New Product","productPhotos":["<image-id>"] }' \
+  http://localhost:8081/api/products
+```
+
+3. Add a single photo to an existing product:
+```bash
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer YOUR_TOKEN" \
+ -d '{"imageRef":"<image-id>"}' http://localhost:8081/api/products/{product-id}/photos
+```
+
+4. Remove a photo from a product:
+```bash
+curl -X DELETE -H "Authorization: Bearer YOUR_TOKEN" \
+  http://localhost:8081/api/products/{product-id}/photos/{photoId}
+```
+
+Notes:
+- `imageRef` may be the `imageId` returned by `/api/images/upload` or the `url`.
+- The API validates that the image belongs to the same company or was uploaded by the same user.
 ```
 
 ## 4. Delivery Module

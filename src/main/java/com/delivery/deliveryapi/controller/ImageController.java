@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.delivery.deliveryapi.service.ImageService;
+import com.delivery.deliveryapi.dto.ImageUploadResult;
 
 @RestController
 @RequestMapping("/images")
@@ -24,7 +25,7 @@ public class ImageController {
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<List<String>> uploadImages(@RequestParam("files") MultipartFile[] files) {
+    public ResponseEntity<List<ImageUploadResult>> uploadImages(@RequestParam("files") MultipartFile[] files) {
         try {
             // Get current user from security context (for authentication check)
             var auth = SecurityContextHolder.getContext().getAuthentication();
@@ -32,16 +33,20 @@ public class ImageController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
 
-            // Upload images
-            List<String> imageUrls = imageService.uploadImages(files);
-            return ResponseEntity.ok(imageUrls);
+            // Upload images - get user id
+            String userId = null;
+            if (auth != null && auth.getPrincipal() instanceof String) {
+                userId = (String) auth.getPrincipal();
+            }
+            List<ImageUploadResult> imageResults = imageService.uploadImages(files, userId);
+            return ResponseEntity.ok(imageResults);
 
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(List.of("Validation error: " + e.getMessage()));
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(List.of(new ImageUploadResult(null, "Validation error: " + e.getMessage())));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(List.of("Error: " + e.getMessage()));
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(List.of(new ImageUploadResult(null, "Error: " + e.getMessage())));
         }
     }
 }

@@ -15,6 +15,7 @@ import com.delivery.deliveryapi.model.Company;
 import com.delivery.deliveryapi.model.Product;
 import com.delivery.deliveryapi.model.ProductCategory;
 import com.delivery.deliveryapi.model.User;
+import com.delivery.deliveryapi.repo.ImageRepository;
 import com.delivery.deliveryapi.repo.ProductCategoryRepository;
 import com.delivery.deliveryapi.repo.ProductRepository;
 
@@ -25,11 +26,17 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final ProductCategoryRepository productCategoryRepository;
+    private final ImageRepository imageRepository;
+    private final com.delivery.deliveryapi.repo.ProductImageRepository productImageRepository;
 
     public ProductService(ProductRepository productRepository,
-                         ProductCategoryRepository productCategoryRepository) {
+                         ProductCategoryRepository productCategoryRepository,
+                         ImageRepository imageRepository,
+                         com.delivery.deliveryapi.repo.ProductImageRepository productImageRepository) {
         this.productRepository = productRepository;
         this.productCategoryRepository = productCategoryRepository;
+        this.imageRepository = imageRepository;
+        this.productImageRepository = productImageRepository;
     }
 
     @Transactional
@@ -47,6 +54,8 @@ public class ProductService {
         product.setName(itemDescription.length() > 100 ? itemDescription.substring(0, 100) : itemDescription);
         product.setDescription(itemDescription);
         product.setDefaultPrice(itemValue);
+        product.setLastSellPrice(itemValue);
+        product.setLastSellPrice(itemValue);
         product.setCategory(getDefaultCategory()); // Default category
         product.setIsActive(true);
 
@@ -141,7 +150,8 @@ public class ProductService {
     @Transactional
     public Product updateProduct(UUID productId, User user, String name, String description,
                                ProductCategory category, BigDecimal defaultPrice,
-                               BigDecimal buyingPrice, BigDecimal sellingPrice, Boolean isPublished) {
+                               BigDecimal buyingPrice, BigDecimal sellingPrice, BigDecimal lastSellPrice, Boolean isPublished,
+                               java.util.List<String> productPhotos) {
         if (productId == null) {
             throw new IllegalArgumentException("Product ID is required");
         }
@@ -176,8 +186,17 @@ public class ProductService {
         if (sellingPrice != null) {
             product.setSellingPrice(sellingPrice);
         }
+        if (lastSellPrice != null) {
+            product.setLastSellPrice(lastSellPrice);
+        }
         if (isPublished != null) {
             product.setIsPublished(isPublished);
+        }
+        if (productPhotos != null) {
+            validateProductPhotos(user, productPhotos);
+            // productPhotos may be array of image URLs or image IDs; resolve to Image entities
+            List<com.delivery.deliveryapi.model.ProductImage> mapped = mapToProductImages(product, productPhotos);
+            product.setProductImages(mapped);
         }
 
         return productRepository.save(product);
@@ -186,7 +205,8 @@ public class ProductService {
     @Transactional
     public Product createProduct(User user, String name, String description,
                                  ProductCategory category, BigDecimal defaultPrice,
-                                 BigDecimal buyingPrice, BigDecimal sellingPrice, Boolean isPublished) {
+                                 BigDecimal buyingPrice, BigDecimal sellingPrice, BigDecimal lastSellPrice, Boolean isPublished,
+                                 java.util.List<String> productPhotos) {
         if (user.getCompany() == null) {
             throw new IllegalArgumentException("User must belong to a company to create products");
         }
@@ -198,9 +218,73 @@ public class ProductService {
         product.setDefaultPrice(defaultPrice != null ? defaultPrice : java.math.BigDecimal.ZERO);
         product.setBuyingPrice(buyingPrice != null ? buyingPrice : java.math.BigDecimal.ZERO);
         product.setSellingPrice(sellingPrice != null ? sellingPrice : java.math.BigDecimal.ZERO);
+        product.setLastSellPrice(lastSellPrice != null ? lastSellPrice : java.math.BigDecimal.ZERO);
         product.setIsPublished(isPublished != null ? isPublished : Boolean.FALSE);
+        if (productPhotos != null) {
+            validateProductPhotos(user, productPhotos);
+            List<com.delivery.deliveryapi.model.ProductImage> mapped = mapToProductImages(product, productPhotos);
+            product.setProductImages(mapped);
+        } else {
+            product.setProductImages(new java.util.ArrayList<>());
+        }
         product.setIsActive(true);
         return productRepository.save(product);
+    }
+
+    private void validateProductPhotos(User user, java.util.List<String> productPhotos) {
+        for (String url : productPhotos) {
+            com.delivery.deliveryapi.model.Image image = findImageByRef(url);
+            if (image == null) throw new IllegalArgumentException("Photo not found: " + url);
+            // allow same-company or same-uploader
+            boolean allowed = false;
+            if (user.getCompany() != null && image.getCompany() != null && user.getCompany().getId().equals(image.getCompany().getId())) {
+                allowed = true;
+            }
+            if (image.getUploader() != null && image.getUploader().getId().equals(user.getId())) {
+                allowed = true;
+            }
+            if (!allowed) throw new IllegalArgumentException("Photo does not belong to your company or you: " + url);
+        }
+    }
+
+    private com.delivery.deliveryapi.model.Image findImageByRef(String ref) {
+        com.delivery.deliveryapi.model.Image image = null;
+        java.util.Optional<java.util.UUID> idOpt = parseUuid(ref);
+        if (idOpt.isPresent()) {
+            image = imageRepository.findById(idOpt.get()).orElse(null);
+        }
+        if (image == null) {
+            var opt = imageRepository.findByUrl(ref);
+            if (opt.isPresent()) image = opt.get();
+        }
+        return image;
+    }
+
+    private java.util.Optional<java.util.UUID> parseUuid(String ref) {
+        try {
+            return java.util.Optional.of(java.util.UUID.fromString(ref));
+        } catch (IllegalArgumentException ex) {
+            // Not a UUID - treat as URL when not parseable
+            return java.util.Optional.empty();
+        }
+    }
+
+    private List<com.delivery.deliveryapi.model.ProductImage> mapToProductImages(Product product, java.util.List<String> productPhotos) {
+        List<com.delivery.deliveryapi.model.ProductImage> images = new java.util.ArrayList<>();
+        int idx = 0;
+        for (String ref : productPhotos) {
+            com.delivery.deliveryapi.model.Image image = null;
+            // Try parse as UUID
+            image = findImageByRef(ref);
+            if (image == null) throw new IllegalArgumentException("Photo not found: " + ref);
+            // Ownership already validated via validateProductPhotos
+            com.delivery.deliveryapi.model.ProductImage pi = new com.delivery.deliveryapi.model.ProductImage();
+            pi.setProduct(product);
+            pi.setImage(image);
+            pi.setPhotoIndex(idx++);
+            images.add(pi);
+        }
+        return images;
     }
 
     @Transactional
@@ -223,6 +307,53 @@ public class ProductService {
 
         product.setIsActive(false);
         productRepository.save(product);
+    }
+
+    @Transactional
+    public Product addPhotoToProduct(UUID productId, User user, String imageRef) {
+        Optional<Product> productOpt = productRepository.findById(productId);
+        if (productOpt.isEmpty()) throw new IllegalArgumentException("Product not found: " + productId);
+        Product product = productOpt.get();
+        // Check user company access
+        if (!product.getCompany().getId().equals(user.getCompany().getId())) {
+            throw new IllegalArgumentException("Access denied: Product belongs to different company");
+        }
+        validateProductPhotos(user, java.util.List.of(imageRef));
+        com.delivery.deliveryapi.model.Image image = findImageByRef(imageRef);
+        if (image == null) throw new IllegalArgumentException("Image not found: " + imageRef);
+        int nextIndex = 0;
+        var existing = productImageRepository.findByProductIdOrderByPhotoIndexAsc(product.getId());
+        if (existing != null && !existing.isEmpty()) nextIndex = existing.get(existing.size() - 1).getPhotoIndex() + 1;
+        com.delivery.deliveryapi.model.ProductImage pi = new com.delivery.deliveryapi.model.ProductImage();
+        pi.setProduct(product);
+        pi.setImage(image);
+        pi.setPhotoIndex(nextIndex);
+        productImageRepository.save(pi);
+        // Refresh product images
+        var updated = productImageRepository.findByProductIdOrderByPhotoIndexAsc(product.getId());
+        product.setProductImages(updated);
+        productRepository.save(product);
+        return product;
+    }
+
+    @Transactional
+    public Product removePhotoFromProduct(UUID productId, User user, UUID photoId) {
+        Optional<com.delivery.deliveryapi.model.ProductImage> pio = productImageRepository.findById(photoId);
+        if (pio.isEmpty()) throw new IllegalArgumentException("Photo not found: " + photoId);
+        com.delivery.deliveryapi.model.ProductImage pi = pio.get();
+        if (!pi.getProduct().getId().equals(productId)) throw new IllegalArgumentException("Photo does not belong to product");
+        // Allow remove if user belongs to same company or uploaded the image
+        boolean allowed = false;
+        if (user.getCompany() != null && pi.getImage().getCompany() != null && user.getCompany().getId().equals(pi.getImage().getCompany().getId())) allowed = true;
+        if (pi.getImage().getUploader() != null && pi.getImage().getUploader().getId().equals(user.getId())) allowed = true;
+        if (!allowed) throw new IllegalArgumentException("User not allowed to remove this photo");
+        productImageRepository.delete(pi);
+        // Refresh product images and save
+        var product = pi.getProduct();
+        var updated = productImageRepository.findByProductIdOrderByPhotoIndexAsc(product.getId());
+        product.setProductImages(updated);
+        productRepository.save(product);
+        return product;
     }
 
     private ProductCategory getDefaultCategory() {

@@ -32,6 +32,9 @@ public class ProductDTO {
     
     @JsonProperty("sellingPrice")
     private BigDecimal sellingPrice;
+
+    @JsonProperty("lastSellPrice")
+    private BigDecimal lastSellPrice;
     
     @JsonProperty("isPublished")
     private Boolean isPublished;
@@ -41,6 +44,22 @@ public class ProductDTO {
     
     @JsonProperty("dimensions")
     private String dimensions;
+    
+    @JsonProperty("productPhotos")
+    private java.util.List<ImageDTO> productPhotos;
+
+    public static class ImageDTO {
+        @JsonProperty("id")
+        private String id;
+        @JsonProperty("url")
+        private String url;
+        public ImageDTO() {}
+        public ImageDTO(String id, String url) { this.id = id; this.url = url; }
+        public String getId() { return id; }
+        public void setId(String id) { this.id = id; }
+        public String getUrl() { return url; }
+        public void setUrl(String url) { this.url = url; }
+    }
     
     @JsonProperty("isActive")
     private Boolean isActive;
@@ -67,6 +86,7 @@ public class ProductDTO {
         dto.setDefaultPrice(product.getDefaultPrice());
         dto.setBuyingPrice(product.getBuyingPrice());
         dto.setSellingPrice(product.getSellingPrice());
+        dto.setLastSellPrice(product.getLastSellPrice());
         dto.setIsPublished(product.getIsPublished());
         dto.setWeightKg(product.getWeightKg());
         dto.setDimensions(product.getDimensions());
@@ -82,6 +102,12 @@ public class ProductDTO {
         if (product.getCategory() != null) {
             dto.setCategoryId(product.getCategory().getId());
             dto.setCategoryName(product.getCategory().getName());
+        }
+        if (product.getProductImages() != null) {
+            java.util.List<ImageDTO> photos = product.getProductImages().stream()
+                    .map(pi -> new ImageDTO(pi.getImage().getId().toString(), pi.getImage().getUrl()))
+                    .toList();
+            dto.setProductPhotos(photos);
         }
         
         return dto;
@@ -112,6 +138,9 @@ public class ProductDTO {
     public BigDecimal getSellingPrice() { return sellingPrice; }
     public void setSellingPrice(BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
 
+    public BigDecimal getLastSellPrice() { return lastSellPrice; }
+    public void setLastSellPrice(BigDecimal lastSellPrice) { this.lastSellPrice = lastSellPrice; }
+
     public Boolean getIsPublished() { return isPublished; }
     public void setIsPublished(Boolean isPublished) { this.isPublished = isPublished; }
 
@@ -135,4 +164,7 @@ public class ProductDTO {
 
     public String getCompanyName() { return companyName; }
     public void setCompanyName(String companyName) { this.companyName = companyName; }
+    
+    public java.util.List<ImageDTO> getProductPhotos() { return productPhotos; }
+    public void setProductPhotos(java.util.List<ImageDTO> productPhotos) { this.productPhotos = productPhotos; }
 }

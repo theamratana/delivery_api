@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import javax.imageio.IIOImage;
@@ -15,19 +16,37 @@ import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.delivery.deliveryapi.model.Image;
+import com.delivery.deliveryapi.dto.ImageUploadResult;
+import com.delivery.deliveryapi.model.User;
+import com.delivery.deliveryapi.repo.ImageRepository;
+import com.delivery.deliveryapi.repo.UserRepository;
+
 @Service
 public class ImageService {
+
+    private static final Logger log = LoggerFactory.getLogger(ImageService.class);
 
     private static final String UPLOAD_DIR = "uploads/images/";
     private static final float JPEG_COMPRESSION_QUALITY = 0.8f; // 80% quality
     private static final long MAX_FILE_SIZE_BYTES = 2L * 1024 * 1024; // 2MB
     private static final String JPEG_CONTENT_TYPE = "image/jpeg";
 
-    public List<String> uploadImages(MultipartFile[] files) {
-        List<String> imageUrls = new ArrayList<>();
+    private final ImageRepository imageRepository;
+    private final UserRepository userRepository;
+
+    public ImageService(ImageRepository imageRepository, UserRepository userRepository) {
+        this.imageRepository = imageRepository;
+        this.userRepository = userRepository;
+    }
+
+    public List<ImageUploadResult> uploadImages(MultipartFile[] files, String uploaderUserId) {
+        List<ImageUploadResult> imageResults = new ArrayList<>();
 
         // Create upload directory if it doesn't exist
         Path uploadPath = Paths.get(UPLOAD_DIR);
@@ -65,10 +84,38 @@ public class ImageService {
             }
 
             // Add to URLs list (relative path)
-            imageUrls.add("/" + UPLOAD_DIR + filename);
+            String url = "/" + UPLOAD_DIR + filename;
+            imageResults.add(new ImageUploadResult(null, url));
+
+            // Persist image metadata with uploader and company (if exists)
+            try {
+                Optional<User> optUser = Optional.empty();
+                if (uploaderUserId != null) {
+                    try { optUser = userRepository.findById(UUID.fromString(uploaderUserId)); } catch (Exception ignored) { log.debug("Invalid uploader id: {}", uploaderUserId); }
+                }
+                Image image = new Image();
+                image.setUrl(url);
+                if (optUser.isPresent()) {
+                    User uploader = optUser.get();
+                    image.setUploader(uploader);
+                    if (uploader.getCompany() != null) image.setCompany(uploader.getCompany());
+                }
+                Image saved = imageRepository.save(image);
+                // update created results with id
+                for (int i = 0; i < imageResults.size(); i++) {
+                    ImageUploadResult r = imageResults.get(i);
+                    if (r.getUrl().equals(url) && (r.getId() == null || r.getId().isEmpty())) {
+                        r.setId(saved.getId().toString());
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                // Persisting metadata should not break upload flow. Just log.
+                log.warn("Failed to save image metadata", e);
+            }
         }
 
-        return imageUrls;
+        return imageResults;
     }
 
     private void saveCompressedImage(MultipartFile file, Path filePath, String contentType) throws IOException {
