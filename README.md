@@ -215,6 +215,13 @@ Notes:
       }
       ```
 
+  - PATCH `/deliveries/{id}/status` → change a delivery item's status (authenticated + authorized)
+    - Body example:
+      ```json
+      { "status": "DELIVERED", "note": "Delivered to front door" }
+      ```
+    - Notes: Allowed for sender, receiver, delivery driver, or company OWNER/MANAGER/system admin. Creates a delivery tracking entry when status is changed.
+
 - Users (phones; JWT required)
   - GET `/users/{userId}/phones` → list phones
   - POST `/users/{userId}/phones` → add phone

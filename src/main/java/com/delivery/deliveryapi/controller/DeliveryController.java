@@ -611,6 +611,77 @@ public class DeliveryController {
         }
     }
 
+    public static class UpdateStatusRequest {
+        @JsonProperty("status")
+        private String status;
+
+        @JsonProperty("note")
+        private String note;
+
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
+
+        public String getNote() { return note; }
+        public void setNote(String note) { this.note = note; }
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<?> changeDeliveryStatus(@PathVariable UUID id, @RequestBody UpdateStatusRequest req) {
+        // Authentication
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID userId;
+        try { userId = UUID.fromString(userIdStr); } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        var optUser = userRepository.findById(userId);
+        if (optUser.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        User currentUser = optUser.get();
+
+        var optItem = deliveryItemRepository.findById(id).filter(d -> !d.isDeleted());
+        if (optItem.isEmpty()) return ResponseEntity.notFound().build();
+        DeliveryItem item = optItem.get();
+
+        // Authorization: user must be involved or company owner/manager or system admin
+        boolean allowed = false;
+        if (item.getSender() != null && item.getSender().getId().equals(currentUser.getId())) allowed = true;
+        if (item.getReceiver() != null && item.getReceiver().getId().equals(currentUser.getId())) allowed = true;
+        if (item.getDeliveryDriver() != null && item.getDeliveryDriver().getId().equals(currentUser.getId())) allowed = true;
+        if (!allowed && item.getDeliveryCompany() != null && currentUser.getCompany() != null && item.getDeliveryCompany().getId().equals(currentUser.getCompany().getId())) {
+            // company members: only OWNER or MANAGER allowed to update package/delivery status for company deliveries
+            if (currentUser.getUserRole() != null && (currentUser.getUserRole().name().equals("OWNER") || currentUser.getUserRole().name().equals("MANAGER") || currentUser.getUserRole().name().equals("SYSTEM_ADMINISTRATOR"))) {
+                allowed = true;
+            }
+        }
+
+        if (!allowed) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Insufficient permissions to change delivery status"));
+        }
+
+        // Parse and validate status
+        if (req == null || req.getStatus() == null || req.getStatus().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "status is required"));
+        }
+
+        DeliveryStatus newStatus;
+        try {
+            newStatus = DeliveryStatus.valueOf(req.getStatus().trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid status value"));
+        }
+
+        // Update status on the delivery item and create a tracking entry
+        item.setStatus(newStatus);
+        deliveryItemRepository.save(item);
+
+        DeliveryTracking tracking = new DeliveryTracking(item, newStatus, req.getNote() != null ? req.getNote() : "Status updated via API", currentUser);
+        deliveryTrackingRepository.save(tracking);
+
+        return ResponseEntity.ok(Map.of("status", newStatus.toString(), "deliveryId", item.getId()));
+    }
+
     // Request/Response DTOs
     public static class CreateDeliveryRequest {
         @JsonProperty("receiverPhone")
