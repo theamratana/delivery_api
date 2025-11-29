@@ -194,6 +194,27 @@ Notes:
   - POST `/auth/otp/request` → body `{ "phone_e164": "+12025550123" }` returns `{ attemptId, deepLink, expiresAt }`
   - POST `/auth/otp/verify` → body `{ "attemptId": "<uuid>", "code": "123456" }` returns `{ token, userId }`
 
+- Deliveries
+  - POST `/deliveries/summary` → returns counts grouped by delivery status for the authenticated user.
+    - Body example (date range in ISO 8601):
+      ```json
+      { "startDate": "2025-11-01", "endDate": "2025-11-29" }
+      ```
+    - Response example:
+      ```json
+      {
+        "CREATED": 10,
+        "ASSIGNED": 3,
+        "PICKED_UP": 2,
+        "IN_TRANSIT": 1,
+        "OUT_FOR_DELIVERY": 0,
+        "DELIVERED": 20,
+        "CANCELLED": 0,
+        "RETURNED": 0,
+        "FAILED": 0
+      }
+      ```
+
 - Users (phones; JWT required)
   - GET `/users/{userId}/phones` → list phones
   - POST `/users/{userId}/phones` → add phone

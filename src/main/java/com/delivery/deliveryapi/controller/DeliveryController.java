@@ -1,7 +1,12 @@
 package com.delivery.deliveryapi.controller;
 
 import java.math.BigDecimal;
+import java.time.DateTimeException;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -55,6 +60,76 @@ public class DeliveryController {
         this.deliveryPhotoRepository = deliveryPhotoRepository;
         this.userRepository = userRepository;
         this.objectMapper = new ObjectMapper();
+    }
+
+    public static class SummaryRequest {
+        @JsonProperty("startDate")
+        private String startDate; // ISO8601 date or datetime
+
+        @JsonProperty("endDate")
+        private String endDate; // ISO8601 date or datetime
+
+        // getters & setters
+        public String getStartDate() { return startDate; }
+        public void setStartDate(String startDate) { this.startDate = startDate; }
+        public String getEndDate() { return endDate; }
+        public void setEndDate(String endDate) { this.endDate = endDate; }
+    }
+
+    @PostMapping("/summary")
+    public ResponseEntity<?> getDeliverySummaryByStatus(@RequestBody SummaryRequest req) {
+        // Auth
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID userId;
+        try { userId = UUID.fromString(userIdStr); } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        var optUser = userRepository.findById(userId);
+        if (optUser.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+
+        // Parse dates with some reasonable defaults
+        OffsetDateTime end = null;
+        OffsetDateTime start = null;
+        try {
+            if (req.getEndDate() != null && !req.getEndDate().isBlank()) {
+                try { end = OffsetDateTime.parse(req.getEndDate()); }
+                catch (DateTimeException dt) { // maybe date-only
+                    end = LocalDate.parse(req.getEndDate()).atTime(23,59,59).atOffset(OffsetDateTime.now().getOffset());
+                }
+            }
+            if (req.getStartDate() != null && !req.getStartDate().isBlank()) {
+                try { start = OffsetDateTime.parse(req.getStartDate()); }
+                catch (DateTimeException dt) { start = LocalDate.parse(req.getStartDate()).atStartOfDay().atOffset(OffsetDateTime.now().getOffset()); }
+            }
+        } catch (DateTimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid date format. Use ISO8601 date or datetime"));
+        }
+
+        if (end == null) end = OffsetDateTime.now();
+        if (start == null) start = end.minusDays(30); // default to last 30 days
+
+        // Query repo for counts grouped by status
+        List<Object[]> rows = deliveryItemRepository.countStatusByUserInRange(userId, start, end);
+
+        // Build result map with all statuses present and defaults to 0
+        Map<String, Long> result = new LinkedHashMap<>();
+        for (DeliveryStatus s : DeliveryStatus.values()) {
+            result.put(s.toString(), 0L);
+        }
+
+        for (Object[] row : rows) {
+            if (row == null || row.length < 2) continue;
+            DeliveryStatus status = (DeliveryStatus) row[0];
+            Number count = (Number) row[1];
+            result.put(status.toString(), count != null ? count.longValue() : 0L);
+        }
+
+        // Return plain JSON with keys equal to status names and values counts
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping
