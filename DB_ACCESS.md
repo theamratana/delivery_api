@@ -48,20 +48,21 @@ docker exec -it delivery-postgres psql -U postgres -d deliverydb
 ```
 
 ### 3) Use Adminer (web UI)
-I added an Adminer service to `docker-compose.yml` that exposes Adminer on port 8080.
+This repository includes an Adminer service that runs inside the compose network and is pre-configured to connect to the Postgres service.
 
-Start Docker and then open:
+Start Docker and then open Adminer in a browser:
 
 ```
-http://localhost:8080
+http://localhost:8888
 ```
 
-Adminer connection values:
+Adminer is pre-filled to connect to the DB service automatically, but here are the manual values if you need them:
 - System: PostgreSQL
-- Server: roluun-db  (or `host.docker.internal` / `localhost:5433` from the host)
-- Username: postgres
-- Password: postgres
-- Database: deliverydb
+- Server: `roluun-db` (recommended when Adminer is running in Docker)
+- Host from the host machine: `localhost:5433` (if you want to connect to Postgres via the host mapping)
+- Username: `postgres`
+- Password: `postgres`
+- Database: `deliverydb`
 
 > Note: When connecting from the host browser, set server to `localhost:5433`.
 > When connecting from Adminer inside the same Docker network, use `roluun-db:5432`.
