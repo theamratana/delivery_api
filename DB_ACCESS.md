@@ -70,7 +70,7 @@ Adminer is pre-filled to connect to the DB service automatically, but here are t
 ### 4) (Optional) Use pgAdmin or other GUI
 If you already prefer a GUI for Postgres you'll have two choices added by the repository:
 
-- Adminer (lightweight, web-based) — available at port 8080
+ - Adminer (lightweight, web-based) — available at port 8888
 - Use pgAdmin locally on your machine
 
 If you run pgAdmin on your desktop, connect like this:
