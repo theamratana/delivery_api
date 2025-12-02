@@ -3,6 +3,7 @@ services:
   postgres:
     image: postgres:16
     container_name: delivery-postgres
+    hostname: roluun-db
     environment:
       POSTGRES_DB: deliverydb
       POSTGRES_USER: postgres
@@ -16,5 +17,50 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - roluun-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: roluun-api
+    hostname: roluun.dev
+    environment:
+      - SERVER_PORT=8081
+      - DB_URL=jdbc:postgresql://roluun-db:5432/deliverydb
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+      - JWT_SECRET=dev-secret-change
+      - JWT_DEV_ENABLED=true
+      - TELEGRAM_BOT_TOKEN=7801597454:AAFGa8SM4bU261Qkk36nrfPqQVhWyZuwpCE
+      - TELEGRAM_BOT_USERNAME=patience_delivery_bot
+      - TELEGRAM_POLLING_ENABLED=true
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - roluun-network
+
+  adminer:
+    image: adminer:latest
+    container_name: roluun-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - roluun-network
+
+
+networks:
+  roluun-network:
+    driver: bridge
+
 volumes:
   pgdata:

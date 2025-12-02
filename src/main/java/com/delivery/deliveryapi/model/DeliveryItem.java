@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -14,7 +16,6 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Table(name = "delivery_items",
@@ -134,6 +135,9 @@ public class DeliveryItem extends AuditableEntity {
     @Column(name = "fee_auto_calculated", nullable = false)
     private Boolean feeAutoCalculated = false;
 
+    @Column(name = "last_status_note", columnDefinition = "TEXT")
+    private String lastStatusNote;
+
     // Constructors
     public DeliveryItem() {}
 
@@ -237,4 +241,7 @@ public class DeliveryItem extends AuditableEntity {
 
     public Boolean getFeeAutoCalculated() { return feeAutoCalculated; }
     public void setFeeAutoCalculated(Boolean feeAutoCalculated) { this.feeAutoCalculated = feeAutoCalculated; }
+
+    public String getLastStatusNote() { return lastStatusNote; }
+    public void setLastStatusNote(String lastStatusNote) { this.lastStatusNote = lastStatusNote; }
 }

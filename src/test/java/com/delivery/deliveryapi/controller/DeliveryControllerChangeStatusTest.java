@@ -1,19 +1,17 @@
 package com.delivery.deliveryapi.controller;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 import java.lang.reflect.Field;
-import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -96,6 +94,9 @@ class DeliveryControllerChangeStatusTest {
         var body = (java.util.Map<String, Object>) resp.getBody();
         assertEquals("DELIVERED", body.get("status"));
         assertEquals(deliveryId, body.get("deliveryId"));
+
+        // Note should be stored on the delivery item
+        assertEquals("Delivered to customer", deliveryItem.getLastStatusNote());
 
         // Verify that save was called for delivery and tracking
         verify(deliveryItemRepository).save(deliveryItem);

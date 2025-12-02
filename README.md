@@ -222,6 +222,8 @@ Notes:
       ```
     - Notes: Allowed for sender, receiver, delivery driver, or company OWNER/MANAGER/system admin. Creates a delivery tracking entry when status is changed.
 
+  - Note storage: When a status change occurs the message/note provided in the request is saved in the `delivery_tracking.description` field (history) and also in `delivery_items.last_status_note` (quick access on the delivery row). A migration file `migration-add-last-status-note.sql` is included to add this column.
+
 - Users (phones; JWT required)
   - GET `/users/{userId}/phones` → list phones
   - POST `/users/{userId}/phones` → add phone

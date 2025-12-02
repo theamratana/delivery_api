@@ -674,6 +674,8 @@ public class DeliveryController {
 
         // Update status on the delivery item and create a tracking entry
         item.setStatus(newStatus);
+        // Store the last status note for quick access on the delivery item
+        item.setLastStatusNote(req.getNote() != null ? req.getNote().trim() : null);
         deliveryItemRepository.save(item);
 
         DeliveryTracking tracking = new DeliveryTracking(item, newStatus, req.getNote() != null ? req.getNote() : "Status updated via API", currentUser);
