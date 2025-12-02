@@ -46,6 +46,19 @@ services:
     networks:
       - roluun-network
 
+  proxy:
+    image: nginx:stable-alpine
+    container_name: roluun-proxy
+    restart: unless-stopped
+    ports:
+      - "8082:80" # host 8082 -> proxy 80 (use roluun.dev:8082 or map to port 80 if preferred)
+    volumes:
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - api
+    networks:
+      - roluun-network
+
   adminer:
     image: adminer:latest
     container_name: roluun-adminer
