@@ -70,7 +70,7 @@ public class Product extends AuditableEntity {
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("photoIndex ASC")
-    private List<com.delivery.deliveryapi.model.ProductImage> productImages = new ArrayList<>();
+    private List<ProductPhoto> productPhotos = new ArrayList<>();
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
@@ -128,8 +128,8 @@ public class Product extends AuditableEntity {
     public String getDimensions() { return dimensions; }
     public void setDimensions(String dimensions) { this.dimensions = dimensions; }
 
-    public List<com.delivery.deliveryapi.model.ProductImage> getProductImages() { return productImages; }
-    public void setProductImages(List<com.delivery.deliveryapi.model.ProductImage> productImages) { this.productImages = productImages; }
+    public List<ProductPhoto> getProductPhotos() { return productPhotos; }
+    public void setProductPhotos(List<ProductPhoto> productPhotos) { this.productPhotos = productPhotos; }
 
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }

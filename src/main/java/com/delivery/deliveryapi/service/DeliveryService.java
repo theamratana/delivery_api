@@ -172,10 +172,11 @@ public class DeliveryService {
                     // No existing product found - auto-create with product name
                     product = productService.createProductFromDelivery(sender, 
                         itemPayload.getProductName(), // Use productName as the product name
-                        itemPayload.getEstimatedValue(), deliveryFee);
+                        itemPayload.getEstimatedValue(), deliveryFee, itemPayload.getItemPhotos());
                     productRepository.flush(); // Ensure product is persisted immediately for next item search
                     autoCreatedProduct = true;
-                    log.info("Created new product: {} (ID: {})", itemPayload.getProductName(), product.getId());
+                    log.info("Created new product: {} (ID: {}) with {} photos", itemPayload.getProductName(), product.getId(), 
+                        itemPayload.getItemPhotos() != null ? itemPayload.getItemPhotos().size() : 0);
                 }
             } else if (itemPayload.getItemDescription() != null && !itemPayload.getItemDescription().trim().isEmpty()) {
                 // FALLBACK: If productName is missing, use itemDescription for first creation
@@ -192,10 +193,11 @@ public class DeliveryService {
                 } else {
                     // Auto-create using description as fallback
                     product = productService.createProductFromDelivery(sender, fallbackName, 
-                        itemPayload.getEstimatedValue(), deliveryFee);
+                        itemPayload.getEstimatedValue(), deliveryFee, itemPayload.getItemPhotos());
                     productRepository.flush(); // Ensure product is persisted immediately
                     autoCreatedProduct = true;
-                    log.info("Created new product from description fallback: {} (ID: {})", fallbackName, product.getId());
+                    log.info("Created new product from description fallback: {} (ID: {}) with {} photos", fallbackName, product.getId(),
+                        itemPayload.getItemPhotos() != null ? itemPayload.getItemPhotos().size() : 0);
                 }
             } else {
                 throw new IllegalArgumentException("Item " + (itemIndex + 1) + ": productName or itemDescription is required");
@@ -336,7 +338,7 @@ public class DeliveryService {
                     product.setLastUsedAt(java.time.OffsetDateTime.now());
                     productRepository.save(product);
                 } else {
-                    product = productService.createProductFromDelivery(sender, itemPayload.getProductName(), itemPayload.getPrice(), context.getDeliveryFee());
+                    product = productService.createProductFromDelivery(sender, itemPayload.getProductName(), itemPayload.getPrice(), context.getDeliveryFee(), itemPayload.getItemPhotos());
                     productRepository.flush();
                     autoCreatedProduct = true;
                 }
@@ -350,7 +352,7 @@ public class DeliveryService {
                     product.setLastUsedAt(java.time.OffsetDateTime.now());
                     productRepository.save(product);
                 } else {
-                    product = productService.createProductFromDelivery(sender, fallbackName, itemPayload.getPrice(), context.getDeliveryFee());
+                    product = productService.createProductFromDelivery(sender, fallbackName, itemPayload.getPrice(), context.getDeliveryFee(), itemPayload.getItemPhotos());
                     productRepository.flush();
                     autoCreatedProduct = true;
                 }

@@ -103,9 +103,9 @@ public class ProductDTO {
             dto.setCategoryId(product.getCategory().getId());
             dto.setCategoryName(product.getCategory().getName());
         }
-        if (product.getProductImages() != null) {
-            java.util.List<ImageDTO> photos = product.getProductImages().stream()
-                    .map(pi -> new ImageDTO(pi.getImage().getId().toString(), pi.getImage().getUrl()))
+        if (product.getProductPhotos() != null) {
+            java.util.List<ImageDTO> photos = product.getProductPhotos().stream()
+                    .map(photo -> new ImageDTO(photo.getId().toString(), photo.getPhotoUrl()))
                     .toList();
             dto.setProductPhotos(photos);
         }
