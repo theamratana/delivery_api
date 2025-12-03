@@ -84,6 +84,7 @@ public class ProductController {
     }
 
     @GetMapping("/search")
+    @Transactional
     public ResponseEntity<ProductSearchResponse> searchProducts(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) String category,
@@ -143,6 +144,7 @@ public class ProductController {
     }
 
     @GetMapping("/suggestions")
+    @Transactional
     public ResponseEntity<List<ProductDTO>> getProductSuggestions(@RequestParam String query) {
         try {
             User currentUser = getCurrentUser();
