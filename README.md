@@ -272,6 +272,22 @@ Notes:
     - Errors: `phoneE164_required`, `phone_already_in_use`
   - PATCH `/users/{userId}/phones/{phoneId}/primary` → set primary phone (enforces one primary)
 
+- Products (JWT required; company-scoped)
+  - **GET `/products/search`** → Advanced search with filters and pagination (NEW)
+    - Query params: `query` (search term), `category` (filter by category), `published` (true/false), `page` (default: 0), `limit` (default: 20)
+    - Returns: `{ products: [...], total: number, page: number, limit: number, hasMore: boolean }`
+    - Example: `/products/search?query=iPhone&category=Electronics&published=true&page=0&limit=10`
+  - GET `/products/suggestions?query=...` → Autocomplete suggestions for product names (fast typeahead)
+  - GET `/products` → List all products for current user's company (with optional `?search=` param)
+  - GET `/products/{productId}` → Get single product details
+  - POST `/products` → Create new product (requires OWNER/MANAGER/STAFF role)
+    - Body: `{ "name", "description", "category", "defaultPrice", "buyingPrice", "sellingPrice", "isPublished", "productPhotos": ["url1", "url2"] }`
+  - PUT `/products/{productId}` → Update product (requires OWNER/MANAGER/STAFF role)
+  - POST `/products/{productId}/deactivate` → Soft delete product
+  - POST `/products/{productId}/photos` → Add photo: `{ "imageRef": "url" }`
+  - DELETE `/products/{productId}/photos/{photoId}` → Remove photo
+  - 📖 **Full documentation**: See `docs/PRODUCT_API.md` for complete guide with examples
+
 ## Example calls
 
 Create dev token and call a protected endpoint:

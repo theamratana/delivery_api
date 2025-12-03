@@ -83,6 +83,65 @@ public class ProductController {
         }
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<ProductSearchResponse> searchProducts(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Boolean published,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int limit) {
+        try {
+            User currentUser = getCurrentUser();
+            
+            // Apply search filters
+            List<Product> products;
+            if (query != null && !query.trim().isEmpty()) {
+                products = productService.searchCompanyProducts(currentUser, query.trim());
+            } else {
+                products = productService.getCompanyProducts(currentUser);
+            }
+            
+            // Filter by category if provided
+            if (category != null && !category.trim().isEmpty()) {
+                String categoryLower = category.trim().toLowerCase();
+                products = products.stream()
+                    .filter(p -> p.getCategory() != null && 
+                            (p.getCategory().getName().toLowerCase().contains(categoryLower) ||
+                             p.getCategory().getCode().toLowerCase().contains(categoryLower)))
+                    .collect(Collectors.toList());
+            }
+            
+            // Filter by published status if provided
+            if (published != null) {
+                products = products.stream()
+                    .filter(p -> published.equals(p.getIsPublished()))
+                    .collect(Collectors.toList());
+            }
+            
+            // Calculate pagination
+            int total = products.size();
+            int start = Math.min(page * limit, total);
+            int end = Math.min(start + limit, total);
+            
+            List<ProductDTO> productDTOs = products.subList(start, end).stream()
+                    .map(ProductDTO::fromProduct)
+                    .collect(Collectors.toList());
+            
+            ProductSearchResponse response = new ProductSearchResponse();
+            response.setProducts(productDTOs);
+            response.setTotal(total);
+            response.setPage(page);
+            response.setLimit(limit);
+            response.setHasMore(end < total);
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Product search failed", e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ProductSearchResponse());
+        }
+    }
+
     @GetMapping("/suggestions")
     public ResponseEntity<List<ProductDTO>> getProductSuggestions(@RequestParam String query) {
         try {
@@ -337,5 +396,45 @@ public class ProductController {
         private String imageRef;
         public String getImageRef() { return imageRef; }
         public void setImageRef(String imageRef) { this.imageRef = imageRef; }
+    }
+    
+    public static class ProductSearchResponse {
+        @JsonProperty("products")
+        private List<ProductDTO> products;
+        
+        @JsonProperty("total")
+        private Integer total;
+        
+        @JsonProperty("page")
+        private Integer page;
+        
+        @JsonProperty("limit")
+        private Integer limit;
+        
+        @JsonProperty("hasMore")
+        private Boolean hasMore;
+        
+        public ProductSearchResponse() {
+            this.products = new java.util.ArrayList<>();
+            this.total = 0;
+            this.page = 0;
+            this.limit = 20;
+            this.hasMore = false;
+        }
+        
+        public List<ProductDTO> getProducts() { return products; }
+        public void setProducts(List<ProductDTO> products) { this.products = products; }
+        
+        public Integer getTotal() { return total; }
+        public void setTotal(Integer total) { this.total = total; }
+        
+        public Integer getPage() { return page; }
+        public void setPage(Integer page) { this.page = page; }
+        
+        public Integer getLimit() { return limit; }
+        public void setLimit(Integer limit) { this.limit = limit; }
+        
+        public Boolean getHasMore() { return hasMore; }
+        public void setHasMore(Boolean hasMore) { this.hasMore = hasMore; }
     }
 }
