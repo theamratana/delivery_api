@@ -97,6 +97,9 @@ public class DeliveryItemDTO {
     @JsonProperty("photoUrls")
     private String photoUrls;
 
+    @JsonProperty("lastStatusNote")
+    private String lastStatusNote;
+
     @JsonProperty("createdAt")
     private OffsetDateTime createdAt;
 
@@ -161,6 +164,7 @@ public class DeliveryItemDTO {
         }
         
         dto.photoUrls = item.getPhotoUrls();
+        dto.lastStatusNote = item.getLastStatusNote();
         dto.createdAt = item.getCreatedAt();
         dto.updatedAt = item.getUpdatedAt();
         
@@ -254,6 +258,9 @@ public class DeliveryItemDTO {
 
     public String getPhotoUrls() { return photoUrls; }
     public void setPhotoUrls(String photoUrls) { this.photoUrls = photoUrls; }
+
+    public String getLastStatusNote() { return lastStatusNote; }
+    public void setLastStatusNote(String lastStatusNote) { this.lastStatusNote = lastStatusNote; }
 
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }

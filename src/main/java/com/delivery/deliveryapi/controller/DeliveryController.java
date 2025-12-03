@@ -8,13 +8,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,7 +22,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.delivery.deliveryapi.dto.DeliveryBatchDTO;
-import com.delivery.deliveryapi.dto.DeliveryItemDTO;
 import com.delivery.deliveryapi.dto.ReceiverSuggestion;
 import com.delivery.deliveryapi.model.Company;
 import com.delivery.deliveryapi.model.DeliveryItem;
@@ -128,8 +127,41 @@ public class DeliveryController {
             result.put(status.toString(), count != null ? count.longValue() : 0L);
         }
 
-        // Return plain JSON with keys equal to status names and values counts
-        return ResponseEntity.ok(result);
+        // Also produce grouped counts by responsible party (Sender, DeliveryCompany, Receiver)
+        Map<String, Map<String, Long>> groups = new LinkedHashMap<>();
+        groups.put("Sender", new LinkedHashMap<>());
+        groups.put("DeliveryCompany", new LinkedHashMap<>());
+        groups.put("Receiver", new LinkedHashMap<>());
+
+        // Map statuses into groups and populate
+        for (Map.Entry<String, Long> e : result.entrySet()) {
+            DeliveryStatus sEnum = DeliveryStatus.valueOf(e.getKey());
+            String group = statusGroupFor(sEnum);
+            Map<String, Long> groupMap = groups.get(group);
+            if (groupMap == null) groupMap = new LinkedHashMap<>();
+            groupMap.put(e.getKey(), e.getValue());
+            groups.put(group, groupMap);
+        }
+
+        // Build final response with both the detailed counts and grouped view
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("counts", result);
+        response.put("groups", groups);
+        // Also include a small mapping to help UIs show which group a status belongs to
+        Map<String, String> statusToGroup = new LinkedHashMap<>();
+        for (DeliveryStatus s : DeliveryStatus.values()) statusToGroup.put(s.toString(), statusGroupFor(s));
+        response.put("statusToGroup", statusToGroup);
+
+        return ResponseEntity.ok(response);
+    }
+
+    private static String statusGroupFor(DeliveryStatus status) {
+        return switch (status) {
+            case CREATED, CANCELLED, FAILED -> "Sender";
+            case ASSIGNED, PICKED_UP, IN_TRANSIT, OUT_FOR_DELIVERY, RETURNED -> "DeliveryCompany";
+            case DELIVERED -> "Receiver";
+            default -> "Sender";
+        };
     }
 
     @PostMapping
@@ -177,30 +209,6 @@ public class DeliveryController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new DeliveryResponse("Error: " + e.getMessage()));
         }
-    }
-
-    @GetMapping
-    public ResponseEntity<List<DeliveryItemDTO>> getUserDeliveries() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        UUID userId;
-        try {
-            userId = UUID.fromString(userIdStr);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        var optUser = userRepository.findById(userId);
-        if (optUser.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        User currentUser = optUser.get();
-        List<DeliveryItem> deliveries = deliveryItemRepository.findByUserInvolved(currentUser);
-        List<DeliveryItemDTO> dtos = deliveries.stream()
-            .map(DeliveryItemDTO::fromDeliveryItem)
-            .collect(Collectors.toList());
-        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/batch/{batchId}")
@@ -264,12 +272,26 @@ public class DeliveryController {
                     d.getItemValue(),
                     d.getProduct() != null ? d.getProduct().getId() : null,
                     d.getStatus().toString(),
-                    itemPhotos
+                    itemPhotos,
+                    d.getLastStatusNote(),
+                    d.getItemDiscount()
                 );
             })
             .toList();
         batch.setItems(items);
         batch.setItemCount(items.size());
+        
+        // Fetch batch-level delivery photos (package photos with sequenceOrder >= 1000)
+        List<String> deliveryPhotos = deliveryPhotoRepository
+            .findByDeliveryItemIdAndDeletedFalseOrderBySequenceOrderAsc(first.getId())
+            .stream()
+            .filter(p -> p.getSequenceOrder() != null && p.getSequenceOrder() >= 1000)
+            .map(DeliveryPhoto::getPhotoUrl)
+            .toList();
+        batch.setDeliveryPhotos(deliveryPhotos);
+        
+        // Calculate totals
+        calculateBatchTotals(batch, batchItems);
         
         return ResponseEntity.ok(batch);
     }
@@ -366,12 +388,26 @@ public class DeliveryController {
                     d.getItemValue(),
                     d.getProduct() != null ? d.getProduct().getId() : null,
                     d.getStatus().toString(),
-                    itemPhotos
+                    itemPhotos,
+                    d.getLastStatusNote(),
+                    d.getItemDiscount()
                 );
             })
             .toList();
         batch.setItems(items);
         batch.setItemCount(items.size());
+        
+        // Fetch batch-level delivery photos
+        List<String> deliveryPhotos = deliveryPhotoRepository
+            .findByDeliveryItemIdAndDeletedFalseOrderBySequenceOrderAsc(first.getId())
+            .stream()
+            .filter(p -> p.getSequenceOrder() != null && p.getSequenceOrder() >= 1000)
+            .map(DeliveryPhoto::getPhotoUrl)
+            .toList();
+        batch.setDeliveryPhotos(deliveryPhotos);
+        
+        // Calculate totals
+        calculateBatchTotals(batch, batchItems);
         
         return ResponseEntity.ok(batch);
     }
@@ -465,6 +501,15 @@ public class DeliveryController {
                 batch.setDeliveryProvince(item.getDeliveryProvince());
                 batch.setDeliveryDistrict(item.getDeliveryDistrict());
                 batch.setDeliveryFee(item.getDeliveryFee());
+                
+                // Pricing and currency fields
+                batch.setCurrency(item.getCurrency());
+                batch.setDeliveryDiscount(item.getDeliveryDiscount());
+                batch.setOrderDiscount(item.getOrderDiscount());
+                batch.setActualDeliveryCost(item.getActualDeliveryCost());
+                batch.setKhrAmount(item.getKhrAmount());
+                batch.setExchangeRateUsed(item.getExchangeRateUsed());
+                
                 batch.setStatus(item.getStatus().toString());
                 batch.setPaymentMethod(item.getPaymentMethod() != null ? item.getPaymentMethod().getCode() : "COD");
                 batch.setEstimatedDeliveryTime(item.getEstimatedDeliveryTime());
@@ -499,9 +544,43 @@ public class DeliveryController {
                 item.getItemValue(),
                 item.getProduct() != null ? item.getProduct().getId() : null,
                 item.getStatus().toString(),
-                itemPhotos
+                itemPhotos,
+                item.getLastStatusNote(),
+                item.getItemDiscount()
             ));
         }
+        
+        // Calculate totals for each batch
+        batches.forEach((key, batch) -> {
+            List<DeliveryItem> batchItems = deliveries.stream()
+                .filter(d -> {
+                    if (d.getBatchId() != null) {
+                        return ("batch:" + d.getBatchId().toString()).equals(key);
+                    } else {
+                        String legacyKey = String.format("legacy:%s|%s|%s|%s",
+                            d.getReceiver() != null ? d.getReceiver().getId() : "unknown",
+                            d.getDeliveryAddress() != null ? d.getDeliveryAddress() : "",
+                            d.getDeliveryProvince() != null ? d.getDeliveryProvince() : "",
+                            d.getDeliveryDistrict() != null ? d.getDeliveryDistrict() : ""
+                        );
+                        return legacyKey.equals(key);
+                    }
+                })
+                .toList();
+            calculateBatchTotals(batch, batchItems);
+            
+            // Fetch delivery photos for this batch
+            if (!batchItems.isEmpty()) {
+                DeliveryItem firstItem = batchItems.get(0);
+                List<String> deliveryPhotos = deliveryPhotoRepository
+                    .findByDeliveryItemIdAndDeletedFalseOrderBySequenceOrderAsc(firstItem.getId())
+                    .stream()
+                    .filter(p -> p.getSequenceOrder() != null && p.getSequenceOrder() >= 1000)
+                    .map(DeliveryPhoto::getPhotoUrl)
+                    .toList();
+                batch.setDeliveryPhotos(deliveryPhotos);
+            }
+        });
         
         // Set item count for each batch
         batches.values().forEach(batch -> batch.setItemCount(batch.getItems().size()));
@@ -575,6 +654,7 @@ public class DeliveryController {
             batch.setDeliveryProvince(first.getDeliveryProvince());
             batch.setDeliveryDistrict(first.getDeliveryDistrict());
             batch.setDeliveryFee(first.getDeliveryFee());
+            
             batch.setStatus(first.getStatus().toString());
             batch.setPaymentMethod(first.getPaymentMethod() != null ? first.getPaymentMethod().getCode() : "COD");
             batch.setEstimatedDeliveryTime(first.getEstimatedDeliveryTime());
@@ -599,11 +679,23 @@ public class DeliveryController {
                         .map(DeliveryPhoto::getPhotoUrl)
                         .toList();
                     return new DeliveryBatchDTO.DeliveryBatchItemDTO(
-                        d.getId(), d.getItemDescription(), d.getQuantity(), d.getItemValue(), d.getProduct() != null ? d.getProduct().getId() : null, d.getStatus().toString(), itemPhotos);
+                        d.getId(), d.getItemDescription(), d.getQuantity(), d.getItemValue(), d.getProduct() != null ? d.getProduct().getId() : null, d.getStatus().toString(), itemPhotos, d.getLastStatusNote(), d.getItemDiscount());
                 })
                 .toList();
             batch.setItems(dtoItems);
             batch.setItemCount(dtoItems.size());
+            
+            // Fetch delivery photos
+            List<String> deliveryPhotos = deliveryPhotoRepository
+                .findByDeliveryItemIdAndDeletedFalseOrderBySequenceOrderAsc(first.getId())
+                .stream()
+                .filter(p -> p.getSequenceOrder() != null && p.getSequenceOrder() >= 1000)
+                .map(DeliveryPhoto::getPhotoUrl)
+                .toList();
+            batch.setDeliveryPhotos(deliveryPhotos);
+            
+            // Calculate totals
+            calculateBatchTotals(batch, batchItems);
 
             return ResponseEntity.ok(batch);
         } catch (Exception e) {
@@ -684,6 +776,57 @@ public class DeliveryController {
         return ResponseEntity.ok(Map.of("status", newStatus.toString(), "deliveryId", item.getId()));
     }
 
+    @GetMapping("/{id}/tracking")
+    public ResponseEntity<?> getDeliveryTracking(@PathVariable UUID id) {
+        // Auth
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID userId;
+        try { userId = UUID.fromString(userIdStr); } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        var optUser = userRepository.findById(userId);
+        if (optUser.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        User currentUser = optUser.get();
+
+        // Find delivery item
+        var optItem = deliveryItemRepository.findById(id).filter(d -> !d.isDeleted());
+        if (optItem.isEmpty()) return ResponseEntity.notFound().build();
+        DeliveryItem item = optItem.get();
+
+        // Authorization: same rules as status change
+        boolean allowed = false;
+        if (item.getSender() != null && item.getSender().getId().equals(currentUser.getId())) allowed = true;
+        if (item.getReceiver() != null && item.getReceiver().getId().equals(currentUser.getId())) allowed = true;
+        if (item.getDeliveryDriver() != null && item.getDeliveryDriver().getId().equals(currentUser.getId())) allowed = true;
+        if (!allowed && item.getDeliveryCompany() != null && currentUser.getCompany() != null && item.getDeliveryCompany().getId().equals(currentUser.getCompany().getId())) {
+            if (currentUser.getUserRole() != null && (currentUser.getUserRole().name().equals("OWNER") || currentUser.getUserRole().name().equals("MANAGER") || currentUser.getUserRole().name().equals("SYSTEM_ADMINISTRATOR"))) {
+                allowed = true;
+            }
+        }
+
+        if (!allowed) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Insufficient permissions to view tracking history"));
+
+        // Fetch tracking entries
+        List<DeliveryTracking> tracks = deliveryTrackingRepository.findByDeliveryItemIdAndDeletedFalseOrderByTimestampDesc(item.getId());
+
+        // Map to DTO
+        List<Map<String, Object>> dto = tracks.stream().map(t -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", t.getId());
+            m.put("status", t.getStatus() != null ? t.getStatus().toString() : null);
+            m.put("description", t.getDescription());
+            m.put("timestamp", t.getTimestamp());
+            m.put("statusUpdatedById", t.getStatusUpdatedBy() != null ? t.getStatusUpdatedBy().getId() : null);
+            m.put("statusUpdatedByName", t.getStatusUpdatedBy() != null ? t.getStatusUpdatedBy().getDisplayName() : null);
+            return m;
+        }).toList();
+
+        return ResponseEntity.ok(dto);
+    }
+
     // Request/Response DTOs
     public static class CreateDeliveryRequest {
         @JsonProperty("receiverPhone")
@@ -731,8 +874,20 @@ public class DeliveryController {
         @JsonProperty("deliveryFee")
         private BigDecimal deliveryFee; // ONE fee for entire delivery (all items share same fee)
 
+        @JsonProperty("deliveryDiscount")
+        private BigDecimal deliveryDiscount; // Discount on delivery fee
+
+        @JsonProperty("orderDiscount")
+        private BigDecimal orderDiscount; // Order-wide discount
+
+        @JsonProperty("actualDeliveryCost")
+        private BigDecimal actualDeliveryCost; // Real delivery cost (even when free)
+
         @JsonProperty("specialInstructions")
         private String specialInstructions;
+
+        @JsonProperty("deliveryPhotos")
+        private List<String> deliveryPhotos; // Package/delivery photos (optional)
 
         // Getters and setters
         public String getReceiverPhone() { return receiverPhone; }
@@ -777,8 +932,20 @@ public class DeliveryController {
         public BigDecimal getDeliveryFee() { return deliveryFee; }
         public void setDeliveryFee(BigDecimal deliveryFee) { this.deliveryFee = deliveryFee; }
 
+        public BigDecimal getDeliveryDiscount() { return deliveryDiscount; }
+        public void setDeliveryDiscount(BigDecimal deliveryDiscount) { this.deliveryDiscount = deliveryDiscount; }
+
+        public BigDecimal getOrderDiscount() { return orderDiscount; }
+        public void setOrderDiscount(BigDecimal orderDiscount) { this.orderDiscount = orderDiscount; }
+
+        public BigDecimal getActualDeliveryCost() { return actualDeliveryCost; }
+        public void setActualDeliveryCost(BigDecimal actualDeliveryCost) { this.actualDeliveryCost = actualDeliveryCost; }
+
         public String getPaymentMethod() { return paymentMethod; }
         public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod != null ? paymentMethod : "COD"; }
+
+        public List<String> getDeliveryPhotos() { return deliveryPhotos; }
+        public void setDeliveryPhotos(List<String> deliveryPhotos) { this.deliveryPhotos = deliveryPhotos; }
 
         public List<DeliveryItemPayload> getItems() { return items; }
         public void setItems(List<DeliveryItemPayload> items) { this.items = items; }
@@ -797,8 +964,14 @@ public class DeliveryController {
         @JsonProperty("itemPhotos")
         private List<String> itemPhotos;
 
+        @JsonProperty("price")
+        private BigDecimal price; // Item price (preferred)
+
         @JsonProperty("estimatedValue")
-        private BigDecimal estimatedValue;
+        private BigDecimal estimatedValue; // Deprecated: use 'price' instead
+
+        @JsonProperty("itemDiscount")
+        private BigDecimal itemDiscount; // Discount on this specific item
 
         @JsonProperty("quantity")
         private Integer quantity = 1; // Default quantity is 1
@@ -822,11 +995,26 @@ public class DeliveryController {
         public List<String> getItemPhotos() { return itemPhotos; }
         public void setItemPhotos(List<String> itemPhotos) { this.itemPhotos = itemPhotos; }
 
-        public BigDecimal getEstimatedValue() { return estimatedValue; }
-        public void setEstimatedValue(BigDecimal estimatedValue) { this.estimatedValue = estimatedValue; }
+        public BigDecimal getPrice() { 
+            // Prefer 'price' but fall back to 'estimatedValue' for backwards compatibility
+            return price != null ? price : estimatedValue; 
+        }
+        public void setPrice(BigDecimal price) { this.price = price; }
+
+        public BigDecimal getEstimatedValue() { return getPrice(); } // Delegate to getPrice()
+        public void setEstimatedValue(BigDecimal estimatedValue) { 
+            // Support old field name
+            if (this.price == null) {
+                this.price = estimatedValue;
+            }
+            this.estimatedValue = estimatedValue;
+        }
 
         public Integer getQuantity() { return quantity != null ? quantity : 1; }
         public void setQuantity(Integer quantity) { this.quantity = quantity != null && quantity > 0 ? quantity : 1; }
+
+        public BigDecimal getItemDiscount() { return itemDiscount; }
+        public void setItemDiscount(BigDecimal itemDiscount) { this.itemDiscount = itemDiscount; }
 
         public String getPaymentMethod() { return paymentMethod; }
         public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod != null ? paymentMethod : "COD"; }
@@ -885,5 +1073,47 @@ public class DeliveryController {
 
         public String getError() { return error; }
         public void setError(String error) { this.error = error; }
+    }
+
+    /**
+     * Calculate subTotal and grandTotal for a batch
+     * Formula: 
+     * - Item Total = (price * quantity) - itemDiscount
+     * - Sub Total = Sum of all Item Totals + deliveryFee - deliveryDiscount
+     * - Grand Total = subTotal - orderDiscount
+     */
+    private void calculateBatchTotals(DeliveryBatchDTO batch, List<DeliveryItem> batchItems) {
+        BigDecimal itemsTotal = BigDecimal.ZERO;
+        
+        // Calculate total from all items (price * quantity - itemDiscount)
+        for (DeliveryItem item : batchItems) {
+            BigDecimal itemValue = item.getItemValue() != null ? item.getItemValue() : BigDecimal.ZERO;
+            int quantity = item.getQuantity() != null ? item.getQuantity() : 1;
+            BigDecimal itemDiscount = item.getItemDiscount() != null ? item.getItemDiscount() : BigDecimal.ZERO;
+            
+            BigDecimal itemTotal = itemValue.multiply(BigDecimal.valueOf(quantity)).subtract(itemDiscount);
+            itemsTotal = itemsTotal.add(itemTotal);
+        }
+        
+        // Get first item for shared fields
+        DeliveryItem first = batchItems.get(0);
+        BigDecimal deliveryFee = first.getDeliveryFee() != null ? first.getDeliveryFee() : BigDecimal.ZERO;
+        BigDecimal deliveryDiscount = first.getDeliveryDiscount() != null ? first.getDeliveryDiscount() : BigDecimal.ZERO;
+        BigDecimal orderDiscount = first.getOrderDiscount() != null ? first.getOrderDiscount() : BigDecimal.ZERO;
+        
+        // Calculate subTotal and grandTotal
+        BigDecimal subTotal = itemsTotal.add(deliveryFee).subtract(deliveryDiscount);
+        BigDecimal grandTotal = subTotal.subtract(orderDiscount);
+        
+        batch.setSubTotal(subTotal);
+        batch.setGrandTotal(grandTotal);
+        
+        // Set discount fields at batch level
+        batch.setDeliveryDiscount(deliveryDiscount);
+        batch.setOrderDiscount(orderDiscount);
+        batch.setCurrency(first.getCurrency() != null ? first.getCurrency() : "USD");
+        batch.setActualDeliveryCost(first.getActualDeliveryCost());
+        batch.setKhrAmount(first.getKhrAmount());
+        batch.setExchangeRateUsed(first.getExchangeRateUsed());
     }
 }

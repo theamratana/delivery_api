@@ -200,18 +200,36 @@ Notes:
       ```json
       { "startDate": "2025-11-01", "endDate": "2025-11-29" }
       ```
-    - Response example:
+    - Response example (detailed + grouped view):
       ```json
       {
-        "CREATED": 10,
-        "ASSIGNED": 3,
-        "PICKED_UP": 2,
-        "IN_TRANSIT": 1,
-        "OUT_FOR_DELIVERY": 0,
-        "DELIVERED": 20,
-        "CANCELLED": 0,
-        "RETURNED": 0,
-        "FAILED": 0
+        "counts": {
+          "CREATED": 33,
+          "ASSIGNED": 0,
+          "PICKED_UP": 0,
+          "IN_TRANSIT": 0,
+          "OUT_FOR_DELIVERY": 0,
+          "DELIVERED": 0,
+          "CANCELLED": 0,
+          "RETURNED": 0,
+          "FAILED": 0
+        },
+        "groups": {
+          "Sender": { "CREATED": 33, "CANCELLED": 0, "FAILED": 0 },
+          "DeliveryCompany": { "ASSIGNED": 0, "PICKED_UP": 0, "IN_TRANSIT": 0, "OUT_FOR_DELIVERY": 0, "RETURNED": 0 },
+          "Receiver": { "DELIVERED": 0 }
+        },
+        "statusToGroup": {
+          "CREATED": "Sender",
+          "ASSIGNED": "DeliveryCompany",
+          "PICKED_UP": "DeliveryCompany",
+          "IN_TRANSIT": "DeliveryCompany",
+          "OUT_FOR_DELIVERY": "DeliveryCompany",
+          "DELIVERED": "Receiver",
+          "CANCELLED": "Sender",
+          "RETURNED": "DeliveryCompany",
+          "FAILED": "Sender"
+        }
       }
       ```
 
@@ -223,6 +241,29 @@ Notes:
     - Notes: Allowed for sender, receiver, delivery driver, or company OWNER/MANAGER/system admin. Creates a delivery tracking entry when status is changed.
 
   - Note storage: When a status change occurs the message/note provided in the request is saved in the `delivery_tracking.description` field (history) and also in `delivery_items.last_status_note` (quick access on the delivery row). A migration file `migration-add-last-status-note.sql` is included to add this column.
+
+- GET `/deliveries/{id}/tracking` → fetch tracking history for a delivery item (authenticated + authorized)
+  - Response example:
+    ```json
+    [
+      {
+        "id":"0d5f....",
+        "status":"CREATED",
+        "description":"Delivery created",
+        "timestamp":"2025-11-29T10:00:00Z",
+        "statusUpdatedById":"f642...",
+        "statusUpdatedByName":"Admin"
+      },
+      {
+        "id":"1a2b....",
+        "status":"DELIVERED",
+        "description":"Delivered at front door",
+        "timestamp":"2025-11-29T10:15:00Z",
+        "statusUpdatedById":"f642...",
+        "statusUpdatedByName":"Driver A"
+      }
+    ]
+    ```
 
 - Users (phones; JWT required)
   - GET `/users/{userId}/phones` → list phones

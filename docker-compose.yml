@@ -28,6 +28,7 @@ services:
     hostname: roluun.dev
     environment:
       - SERVER_PORT=8081
+      - SERVER_ADDRESS=0.0.0.0
       - DB_URL=jdbc:postgresql://roluun-db:5432/deliverydb
       - DB_USERNAME=postgres
       - DB_PASSWORD=postgres
@@ -37,7 +38,7 @@ services:
       - TELEGRAM_BOT_USERNAME=patience_delivery_bot
       - TELEGRAM_POLLING_ENABLED=true
     ports:
-      - "8081:8081"
+      - "0.0.0.0:8081:8081"  # Bind to all interfaces for network access
     volumes:
       - ./uploads:/app/uploads
     depends_on:

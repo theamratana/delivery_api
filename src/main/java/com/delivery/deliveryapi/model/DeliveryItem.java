@@ -112,6 +112,31 @@ public class DeliveryItem extends AuditableEntity {
     @Column(name = "currency", length = 3)
     private String currency = "USD";
 
+    // Pricing breakdown fields
+    @Column(name = "delivery_discount", precision = 10, scale = 2)
+    private BigDecimal deliveryDiscount = BigDecimal.ZERO;
+
+    @Column(name = "item_discount", precision = 10, scale = 2)
+    private BigDecimal itemDiscount = BigDecimal.ZERO;
+
+    @Column(name = "order_discount", precision = 10, scale = 2)
+    private BigDecimal orderDiscount = BigDecimal.ZERO;
+
+    @Column(name = "sub_total", precision = 10, scale = 2)
+    private BigDecimal subTotal;
+
+    @Column(name = "grand_total", precision = 10, scale = 2)
+    private BigDecimal grandTotal;
+
+    @Column(name = "actual_delivery_cost", precision = 10, scale = 2)
+    private BigDecimal actualDeliveryCost;
+
+    @Column(name = "khr_amount", precision = 15, scale = 2)
+    private BigDecimal khrAmount;
+
+    @Column(name = "exchange_rate_used", precision = 10, scale = 4)
+    private BigDecimal exchangeRateUsed;
+
     // Enhanced delivery product features
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id")
@@ -244,4 +269,28 @@ public class DeliveryItem extends AuditableEntity {
 
     public String getLastStatusNote() { return lastStatusNote; }
     public void setLastStatusNote(String lastStatusNote) { this.lastStatusNote = lastStatusNote; }
+
+    public BigDecimal getDeliveryDiscount() { return deliveryDiscount != null ? deliveryDiscount : BigDecimal.ZERO; }
+    public void setDeliveryDiscount(BigDecimal deliveryDiscount) { this.deliveryDiscount = deliveryDiscount; }
+
+    public BigDecimal getItemDiscount() { return itemDiscount != null ? itemDiscount : BigDecimal.ZERO; }
+    public void setItemDiscount(BigDecimal itemDiscount) { this.itemDiscount = itemDiscount; }
+
+    public BigDecimal getOrderDiscount() { return orderDiscount != null ? orderDiscount : BigDecimal.ZERO; }
+    public void setOrderDiscount(BigDecimal orderDiscount) { this.orderDiscount = orderDiscount; }
+
+    public BigDecimal getSubTotal() { return subTotal; }
+    public void setSubTotal(BigDecimal subTotal) { this.subTotal = subTotal; }
+
+    public BigDecimal getGrandTotal() { return grandTotal; }
+    public void setGrandTotal(BigDecimal grandTotal) { this.grandTotal = grandTotal; }
+
+    public BigDecimal getActualDeliveryCost() { return actualDeliveryCost; }
+    public void setActualDeliveryCost(BigDecimal actualDeliveryCost) { this.actualDeliveryCost = actualDeliveryCost; }
+
+    public BigDecimal getKhrAmount() { return khrAmount; }
+    public void setKhrAmount(BigDecimal khrAmount) { this.khrAmount = khrAmount; }
+
+    public BigDecimal getExchangeRateUsed() { return exchangeRateUsed; }
+    public void setExchangeRateUsed(BigDecimal exchangeRateUsed) { this.exchangeRateUsed = exchangeRateUsed; }
 }

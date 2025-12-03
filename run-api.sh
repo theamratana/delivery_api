@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Defaults for local Docker Postgres mapping (host 5433 -> container 5432)
+# Defaults for Docker Postgres mapping (host 5433 -> container 5432)
+# The /api prefix is configured in WebConfig.java via addPathPrefix()
 export DB_URL=${DB_URL:-jdbc:postgresql://localhost:5433/deliverydb}
 export DB_USERNAME=${DB_USERNAME:-postgres}
 export DB_PASSWORD=${DB_PASSWORD:-postgres}
-export SERVER_PORT=8081
+export SERVER_PORT=${SERVER_PORT:-8081}
 
 # Utilities
 port_in_use() {
@@ -74,8 +75,23 @@ wait_for_port_free() {
 
 cmd="${1:-start}"
 
+# Check if Docker is available and containers are running
+docker_available() {
+	command -v docker >/dev/null 2>&1 && docker ps >/dev/null 2>&1
+}
+
+docker_api_running() {
+	docker_available && docker ps --format '{{.Names}}' 2>/dev/null | grep -q "roluun-api"
+}
+
 case "$cmd" in
 	stop)
+		# Try to stop Docker containers first
+		if docker_available; then
+			echo "Stopping Docker containers..."
+			docker compose down 2>/dev/null || echo "⚠️  No Docker containers to stop"
+		fi
+		# Also stop any local process on the port
 		echo "Stopping API server on port ${SERVER_PORT}..."
 		if port_in_use "$SERVER_PORT"; then
 			kill_on_port "$SERVER_PORT"
@@ -90,8 +106,13 @@ case "$cmd" in
 		fi
 		;;
 	status)
-		if port_in_use "$SERVER_PORT"; then
-			echo "✅ Port ${SERVER_PORT} is IN USE (API server running)"
+		# Check Docker first
+		if docker_api_running; then
+			echo "✅ API running in Docker (container: roluun-api)"
+			echo "   Access at: http://localhost:${SERVER_PORT}/api/"
+			exit 0
+		elif port_in_use "$SERVER_PORT"; then
+			echo "✅ Port ${SERVER_PORT} is IN USE (API server running locally)"
 			exit 0
 		else
 			echo "ℹ️  Port ${SERVER_PORT} is FREE (no API server running)"
@@ -109,6 +130,23 @@ case "$cmd" in
 		"$0" start
 		;;
 	start|*)
+		# Check if Docker is available and start via Docker
+		if docker_available; then
+			echo "🐳 Docker detected, starting API via docker-compose..."
+			docker compose up -d postgres api
+			echo "✅ Docker containers started"
+			echo "   Waiting for API to be ready..."
+			sleep 10
+			if curl -s http://localhost:${SERVER_PORT}/api/auth/dev/token/00000000-0000-0000-0000-000000000000 >/dev/null 2>&1; then
+				echo "✅ API is ready!"
+				echo "   Access at: http://localhost:${SERVER_PORT}/api/"
+			else
+				echo "⚠️  API started but may still be initializing. Check logs: docker compose logs api"
+			fi
+			exit 0
+		fi
+		
+		# Fallback to local Gradle run if Docker not available
 		# Ensure port is free (stop any existing process first)
 		if port_in_use "$SERVER_PORT"; then
 			echo "Port ${SERVER_PORT} is busy. Stopping existing process..."
@@ -120,13 +158,14 @@ case "$cmd" in
 		fi
 		
 		echo "🚀 Starting API server on port ${SERVER_PORT}..."
+		echo "   Database: ${DB_URL}"
 		# Choose a launch mechanism that survives shell exit if available
 		if [ -x "./gradlew" ]; then
-			LAUNCH_CMD=("./gradlew" "bootRun" "-Dspring.profiles.active=production")
+			LAUNCH_CMD=("./gradlew" "bootRun")
 		else
-			LAUNCH_CMD=("./gradle-8.5/bin/gradle" "bootRun" "-Dspring.profiles.active=production")
+			LAUNCH_CMD=("./gradle-8.5/bin/gradle" "bootRun")
 		fi
-		# redirect logs to .api.log for easy inspection
+		# Redirect logs to .api.log for easy inspection
 		if command -v nohup >/dev/null 2>&1; then
 			nohup "${LAUNCH_CMD[@]}" > .api.log 2>&1 &
 			echo $! > .pid_api
@@ -137,6 +176,8 @@ case "$cmd" in
 			"${LAUNCH_CMD[@]}" > .api.log 2>&1 &
 			echo $! > .pid_api
 		fi
-		echo "✅ API server started (PID: $(cat .pid_api)). Logs -> .api.log"
+		PID=$(cat .pid_api)
+		echo "✅ API server started (PID: ${PID}). Logs -> .api.log"
+		echo "   Access at: http://localhost:${SERVER_PORT}/api/"
 		;;
 esac

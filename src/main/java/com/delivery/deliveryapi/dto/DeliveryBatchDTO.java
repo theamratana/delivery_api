@@ -38,6 +38,30 @@ public class DeliveryBatchDTO {
     @JsonProperty("deliveryFee")
     private BigDecimal deliveryFee;
 
+    @JsonProperty("currency")
+    private String currency;
+
+    @JsonProperty("deliveryDiscount")
+    private BigDecimal deliveryDiscount;
+
+    @JsonProperty("orderDiscount")
+    private BigDecimal orderDiscount;
+
+    @JsonProperty("subTotal")
+    private BigDecimal subTotal;
+
+    @JsonProperty("grandTotal")
+    private BigDecimal grandTotal;
+
+    @JsonProperty("actualDeliveryCost")
+    private BigDecimal actualDeliveryCost;
+
+    @JsonProperty("khrAmount")
+    private BigDecimal khrAmount;
+
+    @JsonProperty("exchangeRateUsed")
+    private BigDecimal exchangeRateUsed;
+
     @JsonProperty("deliveryCompanyId")
     private UUID deliveryCompanyId;
 
@@ -64,6 +88,9 @@ public class DeliveryBatchDTO {
 
     @JsonProperty("items")
     private List<DeliveryBatchItemDTO> items = new ArrayList<>();
+
+    @JsonProperty("deliveryPhotos")
+    private List<String> deliveryPhotos = new ArrayList<>();
 
     @JsonProperty("createdAt")
     private OffsetDateTime createdAt;
@@ -96,6 +123,30 @@ public class DeliveryBatchDTO {
     public BigDecimal getDeliveryFee() { return deliveryFee; }
     public void setDeliveryFee(BigDecimal deliveryFee) { this.deliveryFee = deliveryFee; }
 
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency; }
+
+    public BigDecimal getDeliveryDiscount() { return deliveryDiscount; }
+    public void setDeliveryDiscount(BigDecimal deliveryDiscount) { this.deliveryDiscount = deliveryDiscount; }
+
+    public BigDecimal getOrderDiscount() { return orderDiscount; }
+    public void setOrderDiscount(BigDecimal orderDiscount) { this.orderDiscount = orderDiscount; }
+
+    public BigDecimal getSubTotal() { return subTotal; }
+    public void setSubTotal(BigDecimal subTotal) { this.subTotal = subTotal; }
+
+    public BigDecimal getGrandTotal() { return grandTotal; }
+    public void setGrandTotal(BigDecimal grandTotal) { this.grandTotal = grandTotal; }
+
+    public BigDecimal getActualDeliveryCost() { return actualDeliveryCost; }
+    public void setActualDeliveryCost(BigDecimal actualDeliveryCost) { this.actualDeliveryCost = actualDeliveryCost; }
+
+    public BigDecimal getKhrAmount() { return khrAmount; }
+    public void setKhrAmount(BigDecimal khrAmount) { this.khrAmount = khrAmount; }
+
+    public BigDecimal getExchangeRateUsed() { return exchangeRateUsed; }
+    public void setExchangeRateUsed(BigDecimal exchangeRateUsed) { this.exchangeRateUsed = exchangeRateUsed; }
+
     public UUID getDeliveryCompanyId() { return deliveryCompanyId; }
     public void setDeliveryCompanyId(UUID deliveryCompanyId) { this.deliveryCompanyId = deliveryCompanyId; }
 
@@ -122,6 +173,9 @@ public class DeliveryBatchDTO {
 
     public List<DeliveryBatchItemDTO> getItems() { return items; }
     public void setItems(List<DeliveryBatchItemDTO> items) { this.items = items; }
+
+    public List<String> getDeliveryPhotos() { return deliveryPhotos; }
+    public void setDeliveryPhotos(List<String> deliveryPhotos) { this.deliveryPhotos = deliveryPhotos; }
 
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
@@ -151,8 +205,14 @@ public class DeliveryBatchDTO {
         @JsonProperty("status")
         private String status;
 
+        @JsonProperty("lastStatusNote")
+        private String lastStatusNote;
+
         @JsonProperty("itemPhotos")
         private List<String> itemPhotos;
+
+        @JsonProperty("itemDiscount")
+        private BigDecimal itemDiscount;
 
         public DeliveryBatchItemDTO() {}
 
@@ -173,6 +233,18 @@ public class DeliveryBatchDTO {
             this.productId = productId;
             this.status = status;
             this.itemPhotos = itemPhotos;
+        }
+
+        public DeliveryBatchItemDTO(UUID itemId, String itemDescription, Integer quantity, BigDecimal itemValue, UUID productId, String status, List<String> itemPhotos, String lastStatusNote, BigDecimal itemDiscount) {
+            this.itemId = itemId;
+            this.itemDescription = itemDescription;
+            this.quantity = quantity;
+            this.itemValue = itemValue;
+            this.productId = productId;
+            this.status = status;
+            this.itemPhotos = itemPhotos;
+            this.lastStatusNote = lastStatusNote;
+            this.itemDiscount = itemDiscount;
         }
 
         // Getters and setters
@@ -196,5 +268,11 @@ public class DeliveryBatchDTO {
 
         public List<String> getItemPhotos() { return itemPhotos; }
         public void setItemPhotos(List<String> itemPhotos) { this.itemPhotos = itemPhotos; }
+
+        public String getLastStatusNote() { return lastStatusNote; }
+        public void setLastStatusNote(String lastStatusNote) { this.lastStatusNote = lastStatusNote; }
+
+        public BigDecimal getItemDiscount() { return itemDiscount; }
+        public void setItemDiscount(BigDecimal itemDiscount) { this.itemDiscount = itemDiscount; }
     }
 }

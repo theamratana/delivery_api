@@ -84,10 +84,22 @@ class DeliveryControllerSummaryTest {
         assertTrue(resp.getBody() instanceof Map);
 
         @SuppressWarnings("unchecked")
-        Map<String, Number> body = (Map<String, Number>) resp.getBody();
-        assertEquals(10L, body.get("CREATED").longValue());
-        assertEquals(20L, body.get("DELIVERED").longValue());
-        // Make sure some other status exists with zero
-        assertTrue(body.containsKey("CANCELLED"));
+        Map<String, Object> body = (Map<String, Object>) resp.getBody();
+        assertTrue(body.containsKey("counts"));
+        assertTrue(body.containsKey("groups"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Number> counts = (Map<String, Number>) body.get("counts");
+        assertEquals(10L, counts.get("CREATED").longValue());
+        assertEquals(20L, counts.get("DELIVERED").longValue());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Map<String, Number>> groups = (Map<String, Map<String, Number>>) body.get("groups");
+        // CREATED should belong to Sender group
+        assertTrue(groups.get("Sender").containsKey("CREATED"));
+        assertEquals(10L, groups.get("Sender").get("CREATED").longValue());
+        // DELIVERED should belong to Receiver group
+        assertTrue(groups.get("Receiver").containsKey("DELIVERED"));
+        assertEquals(20L, groups.get("Receiver").get("DELIVERED").longValue());
     }
 }

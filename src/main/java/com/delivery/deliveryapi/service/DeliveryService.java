@@ -13,9 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.deliveryapi.controller.DeliveryController.CreateDeliveryRequest;
 import com.delivery.deliveryapi.model.Company;
+import com.delivery.deliveryapi.model.DeliveryItem;
 import com.delivery.deliveryapi.model.DeliveryPackage;
 import com.delivery.deliveryapi.model.DeliveryPackageStatus;
-import com.delivery.deliveryapi.model.DeliveryItem;
 import com.delivery.deliveryapi.model.DeliveryPhoto;
 import com.delivery.deliveryapi.model.Product;
 import com.delivery.deliveryapi.model.User;
@@ -218,11 +218,18 @@ public class DeliveryService {
             delivery.setDeliveryAddress(request.getDeliveryAddress());
             delivery.setDeliveryProvince(request.getDeliveryProvince());
             delivery.setDeliveryDistrict(request.getDeliveryDistrict());
-            delivery.setItemValue(itemPayload.getEstimatedValue());
+            delivery.setItemValue(itemPayload.getPrice());
             delivery.setQuantity(itemPayload.getQuantity()); // Set product quantity from payload
             
             // All items share the SAME delivery fee (calculated once at batch level)
             delivery.setDeliveryFee(deliveryFee);
+            
+            // Store discount fields
+            delivery.setDeliveryDiscount(request.getDeliveryDiscount() != null ? request.getDeliveryDiscount() : BigDecimal.ZERO);
+            delivery.setItemDiscount(itemPayload.getItemDiscount() != null ? itemPayload.getItemDiscount() : BigDecimal.ZERO);
+            delivery.setOrderDiscount(request.getOrderDiscount() != null ? request.getOrderDiscount() : BigDecimal.ZERO);
+            delivery.setActualDeliveryCost(request.getActualDeliveryCost() != null ? request.getActualDeliveryCost() : deliveryFee);
+            
             delivery.setEstimatedDeliveryTime(OffsetDateTime.now().plusHours(2));
 
             delivery.setProduct(product);
@@ -251,6 +258,16 @@ public class DeliveryService {
                 }
                 log.info("Created {} photos for item {}", itemPayload.getItemPhotos().size(), itemIndex + 1);
             }
+        }
+
+        // Create batch-level delivery photos if provided (package photos)
+        if (request.getDeliveryPhotos() != null && !request.getDeliveryPhotos().isEmpty() && firstDelivery != null) {
+            int startIndex = 1000; // Use high index to separate from item photos
+            for (int i = 0; i < request.getDeliveryPhotos().size(); i++) {
+                DeliveryPhoto photo = new DeliveryPhoto(firstDelivery, request.getDeliveryPhotos().get(i), startIndex + i);
+                deliveryPhotoRepository.save(photo);
+            }
+            log.info("Created {} delivery/package photos", request.getDeliveryPhotos().size());
         }
 
         log.info("Batch delivery creation completed with {} items", request.getItems().size());
@@ -319,7 +336,7 @@ public class DeliveryService {
                     product.setLastUsedAt(java.time.OffsetDateTime.now());
                     productRepository.save(product);
                 } else {
-                    product = productService.createProductFromDelivery(sender, itemPayload.getProductName(), itemPayload.getEstimatedValue(), context.getDeliveryFee());
+                    product = productService.createProductFromDelivery(sender, itemPayload.getProductName(), itemPayload.getPrice(), context.getDeliveryFee());
                     productRepository.flush();
                     autoCreatedProduct = true;
                 }
@@ -333,7 +350,7 @@ public class DeliveryService {
                     product.setLastUsedAt(java.time.OffsetDateTime.now());
                     productRepository.save(product);
                 } else {
-                    product = productService.createProductFromDelivery(sender, fallbackName, itemPayload.getEstimatedValue(), context.getDeliveryFee());
+                    product = productService.createProductFromDelivery(sender, fallbackName, itemPayload.getPrice(), context.getDeliveryFee());
                     productRepository.flush();
                     autoCreatedProduct = true;
                 }
@@ -356,7 +373,7 @@ public class DeliveryService {
             delivery.setDeliveryAddress(context.getDeliveryAddress());
             delivery.setDeliveryProvince(context.getDeliveryProvince());
             delivery.setDeliveryDistrict(context.getDeliveryDistrict());
-            delivery.setItemValue(itemPayload.getEstimatedValue());
+            delivery.setItemValue(itemPayload.getPrice());
             delivery.setQuantity(itemPayload.getQuantity());
 
             // IMPORTANT: Keep the original delivery fee unchanged
