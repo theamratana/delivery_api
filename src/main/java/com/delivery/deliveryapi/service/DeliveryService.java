@@ -200,7 +200,13 @@ public class DeliveryService {
                         itemPayload.getItemPhotos() != null ? itemPayload.getItemPhotos().size() : 0);
                 }
             } else {
-                throw new IllegalArgumentException("Item " + (itemIndex + 1) + ": productName or itemDescription is required");
+                // No product identifiers provided - create generic product
+                String genericName = "Delivery Item " + (itemIndex + 1);
+                product = productService.createProductFromDelivery(sender, genericName, 
+                    itemPayload.getEstimatedValue(), deliveryFee, itemPayload.getItemPhotos());
+                productRepository.flush();
+                autoCreatedProduct = true;
+                log.info("Created generic product: {} (ID: {})", genericName, product.getId());
             }
 
             // Create delivery item for this product
@@ -357,7 +363,12 @@ public class DeliveryService {
                     autoCreatedProduct = true;
                 }
             } else {
-                throw new IllegalArgumentException("Item " + (i + 1) + ": productName or itemDescription is required");
+                // No product identifiers provided - create generic product
+                String genericName = "Delivery Item " + (i + 1);
+                product = productService.createProductFromDelivery(sender, genericName, 
+                    itemPayload.getPrice(), context.getDeliveryFee(), itemPayload.getItemPhotos());
+                productRepository.flush();
+                autoCreatedProduct = true;
             }
 
             DeliveryItem delivery = new DeliveryItem();
@@ -411,12 +422,7 @@ public class DeliveryService {
         if (request.getItems() == null || request.getItems().isEmpty()) {
             throw new IllegalArgumentException("At least one item is required");
         }
-        for (int i = 0; i < request.getItems().size(); i++) {
-            var item = request.getItems().get(i);
-            if (item.getItemDescription() == null || item.getItemDescription().trim().isEmpty()) {
-                throw new IllegalArgumentException("Item " + (i + 1) + ": itemDescription is required");
-            }
-        }
+        // itemDescription is now optional - can use productName or productId instead
         // Pickup fields are now optional - will be auto-populated from sender if not provided
         if (request.getDeliveryAddress() == null || request.getDeliveryAddress().trim().isEmpty()) {
             throw new IllegalArgumentException("Delivery address is required");
