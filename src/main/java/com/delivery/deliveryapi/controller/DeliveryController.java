@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -40,6 +41,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @RestController
 @RequestMapping("/deliveries")
 public class DeliveryController {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DeliveryController.class);
 
     private final DeliveryService deliveryService;
     private final DeliveryItemRepository deliveryItemRepository;
@@ -231,6 +234,10 @@ public class DeliveryController {
             batch.setReceiverPhone(receiver.getPhoneE164());
         }
         
+        // Set sender information from denormalized fields
+        batch.setSenderName(first.getSenderName());
+        batch.setSenderPhone(first.getSenderPhone());
+        
         batch.setDeliveryAddress(first.getDeliveryAddress());
         batch.setDeliveryProvince(first.getDeliveryProvince());
         batch.setDeliveryDistrict(first.getDeliveryDistrict());
@@ -347,6 +354,10 @@ public class DeliveryController {
             batch.setReceiverName(receiver.getDisplayName());
             batch.setReceiverPhone(receiver.getPhoneE164());
         }
+        
+        // Set sender information from denormalized fields
+        batch.setSenderName(first.getSenderName());
+        batch.setSenderPhone(first.getSenderPhone());
         
         batch.setDeliveryAddress(first.getDeliveryAddress());
         batch.setDeliveryProvince(first.getDeliveryProvince());
@@ -497,6 +508,10 @@ public class DeliveryController {
                     batch.setReceiverPhone(item.getReceiver().getPhoneE164());
                 }
 
+                // Set sender information from denormalized fields
+                batch.setSenderName(item.getSenderName());
+                batch.setSenderPhone(item.getSenderPhone());
+
                 batch.setDeliveryAddress(item.getDeliveryAddress());
                 batch.setDeliveryProvince(item.getDeliveryProvince());
                 batch.setDeliveryDistrict(item.getDeliveryDistrict());
@@ -588,6 +603,124 @@ public class DeliveryController {
         return ResponseEntity.ok(new java.util.ArrayList<>(batches.values()));
     }
 
+    @PutMapping("/batch/{batchId}")
+    @Transactional
+    public ResponseEntity<?> updateDeliveryBatch(@PathVariable String batchId, @RequestBody UpdateDeliveryRequest request) {
+        try {
+            var auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            java.util.UUID userId;
+            try {
+                userId = java.util.UUID.fromString(userIdStr);
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            var optUser = userRepository.findById(userId);
+            if (optUser.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            User currentUser = optUser.get();
+
+            java.util.UUID bid = java.util.UUID.fromString(batchId);
+            java.util.List<com.delivery.deliveryapi.model.DeliveryItem> updated = deliveryService.updateDeliveryBatch(currentUser, bid, request);
+
+            if (updated == null || updated.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new DeliveryResponse("Delivery batch not found or unauthorized"));
+            }
+
+            // Build response
+            var first = updated.get(0);
+            var batch = new DeliveryBatchDTO();
+            batch.setBatchId(first.getBatchId().toString());
+            batch.setReceiverId(first.getReceiver() != null ? first.getReceiver().getId() : null);
+            // Use displayName instead of getFullName() since we update displayName in findOrCreateReceiver
+            if (first.getReceiver() != null) {
+                userRepository.flush(); // Ensure any pending updates are written to DB
+                var freshReceiverOpt = userRepository.findById(first.getReceiver().getId());
+                if (freshReceiverOpt.isPresent()) {
+                    var freshReceiver = freshReceiverOpt.get();
+                    // displayName is what we update, not firstName/lastName
+                    batch.setReceiverName(freshReceiver.getDisplayName() != null ? freshReceiver.getDisplayName() : freshReceiver.getFullName());
+                    batch.setReceiverPhone(freshReceiver.getPhoneE164());
+                } else {
+                    batch.setReceiverName(first.getReceiver().getDisplayName() != null ? first.getReceiver().getDisplayName() : first.getReceiver().getFullName());
+                    batch.setReceiverPhone(first.getReceiver().getPhoneE164());
+                }
+            } else {
+                batch.setReceiverName(null);
+                batch.setReceiverPhone(null);
+            }
+            batch.setSenderName(first.getSenderName());
+            batch.setSenderPhone(first.getSenderPhone());
+            batch.setDeliveryAddress(first.getDeliveryAddress());
+            batch.setDeliveryProvince(first.getDeliveryProvince());
+            batch.setDeliveryDistrict(first.getDeliveryDistrict());
+            batch.setDeliveryFee(first.getDeliveryFee());
+            batch.setCurrency(first.getCurrency());
+            batch.setDeliveryDiscount(first.getDeliveryDiscount());
+            batch.setOrderDiscount(first.getOrderDiscount());
+            batch.setSubTotal(first.getSubTotal());
+            batch.setGrandTotal(first.getGrandTotal());
+            batch.setActualDeliveryCost(first.getActualDeliveryCost());
+            batch.setKhrAmount(first.getKhrAmount());
+            batch.setExchangeRateUsed(first.getExchangeRateUsed());
+            batch.setDeliveryCompanyId(first.getDeliveryCompany() != null ? first.getDeliveryCompany().getId() : null);
+            batch.setDeliveryCompanyName(first.getDeliveryCompany() != null ? first.getDeliveryCompany().getName() : null);
+            batch.setDeliveryDriverId(first.getDeliveryDriver() != null ? first.getDeliveryDriver().getId() : null);
+            batch.setDeliveryDriverName(first.getDeliveryDriver() != null ? first.getDeliveryDriver().getFullName() : null);
+            batch.setStatus(first.getStatus().name());
+            batch.setPaymentMethod(first.getPaymentMethod().name().toLowerCase());
+            batch.setEstimatedDeliveryTime(first.getEstimatedDeliveryTime());
+            batch.setCreatedAt(first.getCreatedAt());
+            batch.setUpdatedAt(first.getUpdatedAt());
+
+            // Get delivery photos from first item
+            var photos = deliveryPhotoRepository.findByDeliveryItemIdOrderBySequenceOrderAsc(first.getId());
+            batch.setDeliveryPhotos(photos.stream().map(DeliveryPhoto::getPhotoUrl).toList());
+
+            // Build items
+            var items = updated.stream().map(item -> {
+                var dto = new DeliveryBatchDTO.DeliveryBatchItemDTO();
+                dto.setItemId(item.getId());
+                dto.setItemDescription(item.getItemDescription());
+                dto.setQuantity(item.getQuantity());
+                dto.setItemValue(item.getItemValue());
+                dto.setProductId(item.getProduct() != null ? item.getProduct().getId() : null);
+                dto.setStatus(item.getStatus().name());
+                dto.setLastStatusNote(item.getLastStatusNote());
+                
+                // Item photos
+                if (item.getPhotoUrls() != null && !item.getPhotoUrls().isBlank()) {
+                    try {
+                        var arr = objectMapper.readValue(item.getPhotoUrls(), java.util.List.class);
+                        dto.setItemPhotos(arr);
+                    } catch (Exception ignored) {
+                        dto.setItemPhotos(java.util.List.of());
+                    }
+                } else {
+                    dto.setItemPhotos(java.util.List.of());
+                }
+                dto.setItemDiscount(item.getItemDiscount());
+                return dto;
+            }).toList();
+
+            batch.setItems(items);
+            batch.setItemCount(items.size());
+
+            return ResponseEntity.ok(batch);
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new DeliveryResponse("Invalid batch ID"));
+        } catch (Exception e) {
+            log.error("Error updating delivery batch", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new DeliveryResponse("Error updating delivery: " + e.getMessage()));
+        }
+    }
+
     @PostMapping("/{batchId}/items")
     @Transactional
     public ResponseEntity<?> appendItemsToBatch(@PathVariable String batchId, @RequestBody Object rawPayload) {
@@ -650,6 +783,11 @@ public class DeliveryController {
                 batch.setReceiverName(first.getReceiver().getDisplayName());
                 batch.setReceiverPhone(first.getReceiver().getPhoneE164());
             }
+            
+            // Set sender information from denormalized fields
+            batch.setSenderName(first.getSenderName());
+            batch.setSenderPhone(first.getSenderPhone());
+            
             batch.setDeliveryAddress(first.getDeliveryAddress());
             batch.setDeliveryProvince(first.getDeliveryProvince());
             batch.setDeliveryDistrict(first.getDeliveryDistrict());
@@ -828,7 +966,148 @@ public class DeliveryController {
     }
 
     // Request/Response DTOs
+    public static class UpdateDeliveryRequest {
+        @JsonProperty("senderName")
+        private String senderName; // Optional: override authenticated user's name
+
+        @JsonProperty("senderPhone")
+        private String senderPhone; // Optional: override authenticated user's phone
+
+        @JsonProperty("receiverPhone")
+        private String receiverPhone;
+
+        @JsonProperty("receiverName")
+        private String receiverName;
+
+        @JsonProperty("deliveryType")
+        private String deliveryType; // "COMPANY" or "DRIVER"
+
+        @JsonProperty("companyName")
+        private String companyName;
+
+        @JsonProperty("companyPhone")
+        private String companyPhone;
+
+        @JsonProperty("driverPhone")
+        private String driverPhone;
+
+        @JsonProperty("paymentMethod")
+        private String paymentMethod;
+
+        @JsonProperty("items")
+        private List<DeliveryItemPayload> items; // Updated list of delivery items
+
+        @JsonProperty("pickupAddress")
+        private String pickupAddress;
+
+        @JsonProperty("pickupProvince")
+        private String pickupProvince;
+
+        @JsonProperty("pickupDistrict")
+        private String pickupDistrict;
+
+        @JsonProperty("deliveryAddress")
+        private String deliveryAddress;
+
+        @JsonProperty("deliveryProvince")
+        private String deliveryProvince;
+
+        @JsonProperty("deliveryDistrict")
+        private String deliveryDistrict;
+
+        @JsonProperty("deliveryFee")
+        private BigDecimal deliveryFee;
+
+        @JsonProperty("deliveryDiscount")
+        private BigDecimal deliveryDiscount;
+
+        @JsonProperty("orderDiscount")
+        private BigDecimal orderDiscount;
+
+        @JsonProperty("actualDeliveryCost")
+        private BigDecimal actualDeliveryCost;
+
+        @JsonProperty("specialInstructions")
+        private String specialInstructions;
+
+        @JsonProperty("deliveryPhotos")
+        private List<String> deliveryPhotos;
+
+        // Getters and setters for UpdateDeliveryRequest
+        public String getSenderName() { return senderName; }
+        public void setSenderName(String senderName) { this.senderName = senderName; }
+
+        public String getSenderPhone() { return senderPhone; }
+        public void setSenderPhone(String senderPhone) { this.senderPhone = senderPhone; }
+
+        public String getReceiverPhone() { return receiverPhone; }
+        public void setReceiverPhone(String receiverPhone) { this.receiverPhone = receiverPhone; }
+
+        public String getReceiverName() { return receiverName; }
+        public void setReceiverName(String receiverName) { this.receiverName = receiverName; }
+
+        public String getDeliveryType() { return deliveryType; }
+        public void setDeliveryType(String deliveryType) { this.deliveryType = deliveryType; }
+
+        public String getCompanyName() { return companyName; }
+        public void setCompanyName(String companyName) { this.companyName = companyName; }
+
+        public String getCompanyPhone() { return companyPhone; }
+        public void setCompanyPhone(String companyPhone) { this.companyPhone = companyPhone; }
+
+        public String getDriverPhone() { return driverPhone; }
+        public void setDriverPhone(String driverPhone) { this.driverPhone = driverPhone; }
+
+        public String getPickupAddress() { return pickupAddress; }
+        public void setPickupAddress(String pickupAddress) { this.pickupAddress = pickupAddress; }
+
+        public String getPickupProvince() { return pickupProvince; }
+        public void setPickupProvince(String pickupProvince) { this.pickupProvince = pickupProvince; }
+
+        public String getPickupDistrict() { return pickupDistrict; }
+        public void setPickupDistrict(String pickupDistrict) { this.pickupDistrict = pickupDistrict; }
+
+        public String getDeliveryAddress() { return deliveryAddress; }
+        public void setDeliveryAddress(String deliveryAddress) { this.deliveryAddress = deliveryAddress; }
+
+        public String getDeliveryProvince() { return deliveryProvince; }
+        public void setDeliveryProvince(String deliveryProvince) { this.deliveryProvince = deliveryProvince; }
+
+        public String getDeliveryDistrict() { return deliveryDistrict; }
+        public void setDeliveryDistrict(String deliveryDistrict) { this.deliveryDistrict = deliveryDistrict; }
+
+        public String getSpecialInstructions() { return specialInstructions; }
+        public void setSpecialInstructions(String specialInstructions) { this.specialInstructions = specialInstructions; }
+
+        public BigDecimal getDeliveryFee() { return deliveryFee; }
+        public void setDeliveryFee(BigDecimal deliveryFee) { this.deliveryFee = deliveryFee; }
+
+        public BigDecimal getDeliveryDiscount() { return deliveryDiscount; }
+        public void setDeliveryDiscount(BigDecimal deliveryDiscount) { this.deliveryDiscount = deliveryDiscount; }
+
+        public BigDecimal getOrderDiscount() { return orderDiscount; }
+        public void setOrderDiscount(BigDecimal orderDiscount) { this.orderDiscount = orderDiscount; }
+
+        public BigDecimal getActualDeliveryCost() { return actualDeliveryCost; }
+        public void setActualDeliveryCost(BigDecimal actualDeliveryCost) { this.actualDeliveryCost = actualDeliveryCost; }
+
+        public String getPaymentMethod() { return paymentMethod; }
+        public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+
+        public List<String> getDeliveryPhotos() { return deliveryPhotos; }
+        public void setDeliveryPhotos(List<String> deliveryPhotos) { this.deliveryPhotos = deliveryPhotos; }
+
+        public List<DeliveryItemPayload> getItems() { return items; }
+        public void setItems(List<DeliveryItemPayload> items) { this.items = items; }
+    }
+
     public static class CreateDeliveryRequest {
+        @JsonProperty("senderName")
+        private String senderName; // Optional: override authenticated user's name
+
+        @JsonProperty("senderPhone")
+        private String senderPhone; // Optional: override authenticated user's phone
+
         @JsonProperty("receiverPhone")
         private String receiverPhone;
 
@@ -889,7 +1168,13 @@ public class DeliveryController {
         @JsonProperty("deliveryPhotos")
         private List<String> deliveryPhotos; // Package/delivery photos (optional)
 
-        // Getters and setters
+        // Getters and setters for CreateDeliveryRequest
+        public String getSenderName() { return senderName; }
+        public void setSenderName(String senderName) { this.senderName = senderName; }
+
+        public String getSenderPhone() { return senderPhone; }
+        public void setSenderPhone(String senderPhone) { this.senderPhone = senderPhone; }
+
         public String getReceiverPhone() { return receiverPhone; }
         public void setReceiverPhone(String receiverPhone) { this.receiverPhone = receiverPhone; }
 

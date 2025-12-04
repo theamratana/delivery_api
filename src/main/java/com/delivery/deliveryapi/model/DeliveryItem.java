@@ -41,6 +41,12 @@ public class DeliveryItem extends AuditableEntity {
     @JoinColumn(name = "sender_id")
     private User sender;
 
+    @Column(name = "sender_name", length = 255)
+    private String senderName;
+
+    @Column(name = "sender_phone", length = 20)
+    private String senderPhone;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "receiver_id")
     private User receiver;
@@ -179,6 +185,12 @@ public class DeliveryItem extends AuditableEntity {
 
     public User getSender() { return sender; }
     public void setSender(User sender) { this.sender = sender; }
+
+    public String getSenderName() { return senderName; }
+    public void setSenderName(String senderName) { this.senderName = senderName; }
+
+    public String getSenderPhone() { return senderPhone; }
+    public void setSenderPhone(String senderPhone) { this.senderPhone = senderPhone; }
 
     public User getReceiver() { return receiver; }
     public void setReceiver(User receiver) { this.receiver = receiver; }

@@ -23,8 +23,11 @@ import com.delivery.deliveryapi.model.UserType;
 import com.delivery.deliveryapi.repo.CompanyRepository;
 import com.delivery.deliveryapi.repo.DeliveryItemRepository;
 import com.delivery.deliveryapi.repo.DeliveryPhotoRepository;
+import com.delivery.deliveryapi.repo.DeliveryTrackingRepository;
 import com.delivery.deliveryapi.repo.ProductRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
+
+import jakarta.persistence.EntityManager;
 
 @Service
 public class DeliveryService {
@@ -37,27 +40,33 @@ public class DeliveryService {
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
     private final DeliveryPhotoRepository deliveryPhotoRepository;
+    private final DeliveryTrackingRepository deliveryTrackingRepository;
     private final DeliveryPricingService deliveryPricingService;
     private final ProductService productService;
     private final ProductRepository productRepository;
     private final com.delivery.deliveryapi.repo.DeliveryPackageRepository deliveryPackageRepository;
+    private final EntityManager entityManager;
 
     public DeliveryService(DeliveryItemRepository deliveryItemRepository,
                           UserRepository userRepository,
                           CompanyRepository companyRepository,
                           DeliveryPhotoRepository deliveryPhotoRepository,
+                          DeliveryTrackingRepository deliveryTrackingRepository,
                           DeliveryPricingService deliveryPricingService,
                           ProductService productService,
                           ProductRepository productRepository,
-                          com.delivery.deliveryapi.repo.DeliveryPackageRepository deliveryPackageRepository) {
+                          com.delivery.deliveryapi.repo.DeliveryPackageRepository deliveryPackageRepository,
+                          EntityManager entityManager) {
         this.deliveryItemRepository = deliveryItemRepository;
         this.userRepository = userRepository;
         this.companyRepository = companyRepository;
         this.deliveryPhotoRepository = deliveryPhotoRepository;
+        this.deliveryTrackingRepository = deliveryTrackingRepository;
         this.deliveryPricingService = deliveryPricingService;
         this.productService = productService;
         this.productRepository = productRepository;
         this.deliveryPackageRepository = deliveryPackageRepository;
+        this.entityManager = entityManager;
     }
 
     @Transactional
@@ -212,6 +221,9 @@ public class DeliveryService {
             // Create delivery item for this product
             DeliveryItem delivery = new DeliveryItem();
             delivery.setSender(sender);
+            // Use sender override from request if provided, otherwise use authenticated user's info
+            delivery.setSenderName(request.getSenderName() != null ? request.getSenderName() : sender.getFullName());
+            delivery.setSenderPhone(request.getSenderPhone() != null ? request.getSenderPhone() : sender.getPhoneE164());
             delivery.setReceiver(receiver);
             delivery.setDeliveryCompany(deliveryCompany);
             delivery.setDeliveryDriver(deliveryDriver);
@@ -373,6 +385,8 @@ public class DeliveryService {
 
             DeliveryItem delivery = new DeliveryItem();
             delivery.setSender(sender);
+            delivery.setSenderName(sender.getFullName());
+            delivery.setSenderPhone(sender.getPhoneE164());
             delivery.setReceiver(context.getReceiver());
             delivery.setDeliveryCompany(context.getDeliveryCompany());
             delivery.setDeliveryDriver(context.getDeliveryDriver());
@@ -408,6 +422,202 @@ public class DeliveryService {
         }
 
         return created;
+    }
+
+    @Transactional
+    public java.util.List<DeliveryItem> updateDeliveryBatch(User sender, java.util.UUID batchId,
+            com.delivery.deliveryapi.controller.DeliveryController.UpdateDeliveryRequest request) {
+        if (batchId == null) throw new IllegalArgumentException("batchId is required");
+
+        // Ensure package exists
+        var optPkg = deliveryPackageRepository.findById(batchId);
+        if (optPkg.isEmpty()) {
+            throw new IllegalArgumentException("Batch not found: " + batchId);
+        }
+        DeliveryPackage pkg = optPkg.get();
+        
+        // Only allow editing CREATED or AWAITING_PICKUP
+        if (pkg.getStatus() != DeliveryPackageStatus.CREATED && pkg.getStatus() != DeliveryPackageStatus.AWAITING_PICKUP) {
+            throw new IllegalArgumentException("Cannot edit delivery in status: " + pkg.getStatus());
+        }
+
+        // Get existing items
+        java.util.List<DeliveryItem> existing = deliveryItemRepository.findByBatchId(batchId);
+        if (existing == null || existing.isEmpty()) {
+            throw new IllegalArgumentException("No existing items found for batch: " + batchId);
+        }
+
+        DeliveryItem context = existing.get(0);
+
+        // Security check: only original sender or same company can edit
+        if (!sender.getId().equals(context.getSender().getId())) {
+            if (sender.getCompany() == null || context.getSender().getCompany() == null ||
+                !sender.getCompany().getId().equals(context.getSender().getCompany().getId())) {
+                throw new IllegalArgumentException("Not allowed to edit this batch");
+            }
+        }
+
+        // Resolve receiver
+        User receiver = context.getReceiver();
+        if (request.getReceiverPhone() != null && !request.getReceiverPhone().isBlank()) {
+            receiver = findOrCreateReceiver(request.getReceiverPhone(), request.getReceiverName());
+        }
+
+        // Resolve delivery company/driver
+        Company deliveryCompany = context.getDeliveryCompany();
+        User deliveryDriver = context.getDeliveryDriver();
+
+        if ("COMPANY".equalsIgnoreCase(request.getDeliveryType()) && request.getCompanyName() != null) {
+            deliveryCompany = findOrCreateCompany(request.getCompanyName());
+            deliveryDriver = null;
+        } else if ("DRIVER".equalsIgnoreCase(request.getDeliveryType()) && request.getDriverPhone() != null) {
+            deliveryDriver = findOrCreateDriver(request.getDriverPhone());
+            deliveryCompany = null;
+        }
+
+        // Delete related records first (foreign key constraints)
+        for (DeliveryItem item : existing) {
+            // Delete tracking records
+            var trackingRecords = deliveryTrackingRepository.findByDeliveryItemIdOrderByTimestampDesc(item.getId());
+            if (!trackingRecords.isEmpty()) {
+                deliveryTrackingRepository.deleteAll(trackingRecords);
+            }
+            
+            // Delete photos
+            var photos = deliveryPhotoRepository.findByDeliveryItemIdOrderBySequenceOrderAsc(item.getId());
+            if (!photos.isEmpty()) {
+                deliveryPhotoRepository.deleteAll(photos);
+            }
+        }
+        deliveryTrackingRepository.flush();
+        deliveryPhotoRepository.flush();
+
+        // Delete existing items - we'll recreate them
+        deliveryItemRepository.deleteAll(existing);
+        deliveryItemRepository.flush();
+
+        // If items provided, create new ones
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new IllegalArgumentException("Items list cannot be empty");
+        }
+
+        java.util.List<DeliveryItem> updatedItems = new java.util.ArrayList<>();
+
+        for (int i = 0; i < request.getItems().size(); i++) {
+            var itemPayload = request.getItems().get(i);
+
+            // Product resolution
+            Product product = null;
+            boolean autoCreatedProduct = false;
+
+            if (itemPayload.getProductId() != null) {
+                Optional<Product> existingProduct = productRepository.findById(itemPayload.getProductId());
+                if (existingProduct.isPresent()) {
+                    product = existingProduct.get();
+                    if (!product.getCompany().getId().equals(sender.getCompany().getId())) {
+                        throw new IllegalArgumentException("Access denied: Product belongs to different company");
+                    }
+                    product.setUsageCount(product.getUsageCount() + 1);
+                    product.setLastUsedAt(java.time.OffsetDateTime.now());
+                    productRepository.save(product);
+                } else {
+                    throw new IllegalArgumentException("Product not found: " + itemPayload.getProductId());
+                }
+            } else if (itemPayload.getProductName() != null && !itemPayload.getProductName().trim().isEmpty()) {
+                String searchName = itemPayload.getProductName().trim();
+                java.util.List<Product> existingProducts = productRepository.searchProductsByName(sender.getCompany().getId(), searchName);
+                if (!existingProducts.isEmpty()) {
+                    product = existingProducts.get(0);
+                    product.setUsageCount(product.getUsageCount() + 1);
+                    product.setLastUsedAt(java.time.OffsetDateTime.now());
+                    productRepository.save(product);
+                } else {
+                    product = productService.createProductFromDelivery(sender, itemPayload.getProductName(), 
+                        itemPayload.getPrice(), request.getDeliveryFee(), itemPayload.getItemPhotos());
+                    productRepository.flush();
+                    autoCreatedProduct = true;
+                }
+            } else {
+                String genericName = "Delivery Item " + (i + 1);
+                product = productService.createProductFromDelivery(sender, genericName, 
+                    itemPayload.getPrice(), request.getDeliveryFee(), itemPayload.getItemPhotos());
+                productRepository.flush();
+                autoCreatedProduct = true;
+            }
+
+            DeliveryItem delivery = new DeliveryItem();
+            delivery.setSender(sender);
+            // Use sender override from request if provided, otherwise use authenticated user's info
+            delivery.setSenderName(request.getSenderName() != null ? request.getSenderName() : sender.getFullName());
+            delivery.setSenderPhone(request.getSenderPhone() != null ? request.getSenderPhone() : sender.getPhoneE164());
+            delivery.setReceiver(receiver);
+            delivery.setDeliveryCompany(deliveryCompany);
+            delivery.setDeliveryDriver(deliveryDriver);
+            delivery.setItemDescription(itemPayload.getItemDescription());
+            delivery.setPaymentMethod(itemPayload.getPaymentMethod() != null ? 
+                com.delivery.deliveryapi.model.PaymentMethod.valueOf(itemPayload.getPaymentMethod().toUpperCase()) : 
+                com.delivery.deliveryapi.model.PaymentMethod.COD);
+
+            delivery.setPickupAddress(request.getPickupAddress());
+            delivery.setPickupProvince(request.getPickupProvince());
+            delivery.setPickupDistrict(request.getPickupDistrict());
+            delivery.setDeliveryAddress(request.getDeliveryAddress());
+            delivery.setDeliveryProvince(request.getDeliveryProvince());
+            delivery.setDeliveryDistrict(request.getDeliveryDistrict());
+
+            delivery.setDeliveryFee(request.getDeliveryFee() != null ? request.getDeliveryFee() : BigDecimal.ZERO);
+            delivery.setItemValue(itemPayload.getPrice() != null ? itemPayload.getPrice() : 
+                (itemPayload.getEstimatedValue() != null ? itemPayload.getEstimatedValue() : BigDecimal.ZERO));
+            delivery.setQuantity(itemPayload.getQuantity() != null ? itemPayload.getQuantity() : 1);
+            delivery.setBatchId(batchId);
+            delivery.setDeliveryDiscount(request.getDeliveryDiscount() != null ? request.getDeliveryDiscount() : BigDecimal.ZERO);
+            delivery.setItemDiscount(itemPayload.getItemDiscount() != null ? itemPayload.getItemDiscount() : BigDecimal.ZERO);
+            delivery.setOrderDiscount(request.getOrderDiscount() != null ? request.getOrderDiscount() : BigDecimal.ZERO);
+            delivery.setActualDeliveryCost(request.getActualDeliveryCost());
+            delivery.setProduct(product);
+            delivery.setAutoCreatedProduct(autoCreatedProduct);
+
+            // Calculate totals
+            BigDecimal itemSubTotal = delivery.getItemValue().multiply(new BigDecimal(delivery.getQuantity()));
+            itemSubTotal = itemSubTotal.subtract(delivery.getItemDiscount());
+            delivery.setSubTotal(itemSubTotal);
+
+            BigDecimal grandTotal = itemSubTotal.add(delivery.getDeliveryFee())
+                .subtract(delivery.getDeliveryDiscount())
+                .subtract(delivery.getOrderDiscount());
+            delivery.setGrandTotal(grandTotal);
+
+            // Item photos
+            if (itemPayload.getItemPhotos() != null && !itemPayload.getItemPhotos().isEmpty()) {
+                try {
+                    String photoJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(itemPayload.getItemPhotos());
+                    delivery.setPhotoUrls(photoJson);
+                } catch (Exception ignored) {}
+            }
+
+            delivery.setStatus(com.delivery.deliveryapi.model.DeliveryStatus.CREATED);
+            delivery.setEstimatedDeliveryTime(java.time.OffsetDateTime.now().plusHours(24));
+
+            updatedItems.add(deliveryItemRepository.save(delivery));
+        }
+
+        // Update delivery photos if provided
+        if (request.getDeliveryPhotos() != null && !updatedItems.isEmpty()) {
+            var existingPhotos = deliveryPhotoRepository.findByDeliveryItemIdOrderBySequenceOrderAsc(updatedItems.get(0).getId());
+            deliveryPhotoRepository.deleteAll(existingPhotos);
+            
+            for (String photoUrl : request.getDeliveryPhotos()) {
+                if (photoUrl != null && !photoUrl.isBlank()) {
+                    DeliveryPhoto photo = new DeliveryPhoto();
+                    photo.setDeliveryItem(updatedItems.get(0));
+                    photo.setPhotoUrl(photoUrl);
+                    deliveryPhotoRepository.save(photo);
+                }
+            }
+        }
+
+        deliveryItemRepository.flush();
+        return updatedItems;
     }
 
     private void validateCreateDeliveryRequest(CreateDeliveryRequest request) {
@@ -467,7 +677,13 @@ public class DeliveryService {
 
         Optional<User> existingUser = userRepository.findByPhoneE164(normalizedPhone);
         if (existingUser.isPresent()) {
-            return existingUser.get();
+            User receiver = existingUser.get();
+            // Update display name if provided and different
+            if (name != null && !name.trim().isEmpty() && !name.trim().equals(receiver.getDisplayName())) {
+                receiver.setDisplayName(name.trim());
+                return userRepository.save(receiver);
+            }
+            return receiver;
         }
 
         // Create unverified receiver
@@ -485,14 +701,14 @@ public class DeliveryService {
     }
 
     private Company findOrCreateCompany(String name) {
-        // Try to find existing company by phone (this is a simplified approach)
-        // In a real implementation, you'd need a way to link companies to phone numbers
+        // Try to find existing company by name
         Optional<Company> existingCompany = companyRepository.findByName(name);
         if (existingCompany.isPresent()) {
+            // Return existing company - name doesn't need updating since we search by name
             return existingCompany.get();
         }
 
-        // Create unverified company
+        // Create new company
         Company company = new Company();
         company.setName(name);
         company.setActive(true);

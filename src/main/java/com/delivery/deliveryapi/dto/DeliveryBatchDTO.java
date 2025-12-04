@@ -26,6 +26,12 @@ public class DeliveryBatchDTO {
     @JsonProperty("receiverPhone")
     private String receiverPhone;
 
+    @JsonProperty("senderName")
+    private String senderName;
+
+    @JsonProperty("senderPhone")
+    private String senderPhone;
+
     @JsonProperty("deliveryAddress")
     private String deliveryAddress;
 
@@ -110,6 +116,12 @@ public class DeliveryBatchDTO {
 
     public String getReceiverPhone() { return receiverPhone; }
     public void setReceiverPhone(String receiverPhone) { this.receiverPhone = receiverPhone; }
+
+    public String getSenderName() { return senderName; }
+    public void setSenderName(String senderName) { this.senderName = senderName; }
+
+    public String getSenderPhone() { return senderPhone; }
+    public void setSenderPhone(String senderPhone) { this.senderPhone = senderPhone; }
 
     public String getDeliveryAddress() { return deliveryAddress; }
     public void setDeliveryAddress(String deliveryAddress) { this.deliveryAddress = deliveryAddress; }
