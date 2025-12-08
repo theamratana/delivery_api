@@ -72,6 +72,15 @@ public class User {
     @JoinColumn(name = "company_id")
     private Company company;
 
+    @Column(name = "default_address", columnDefinition = "TEXT")
+    private String defaultAddress;
+
+    @Column(name = "default_province_id")
+    private UUID defaultProvinceId;
+
+    @Column(name = "default_district_id")
+    private UUID defaultDistrictId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "user_role")
     private UserRole userRole;
@@ -116,6 +125,12 @@ public class User {
     public void setUserType(UserType userType) { this.userType = userType; }
     public Company getCompany() { return company; }
     public void setCompany(Company company) { this.company = company; }
+    public String getDefaultAddress() { return defaultAddress; }
+    public void setDefaultAddress(String defaultAddress) { this.defaultAddress = defaultAddress; }
+    public UUID getDefaultProvinceId() { return defaultProvinceId; }
+    public void setDefaultProvinceId(UUID defaultProvinceId) { this.defaultProvinceId = defaultProvinceId; }
+    public UUID getDefaultDistrictId() { return defaultDistrictId; }
+    public void setDefaultDistrictId(UUID defaultDistrictId) { this.defaultDistrictId = defaultDistrictId; }
     public UserRole getUserRole() { return userRole; }
     public void setUserRole(UserRole userRole) { this.userRole = userRole; }
     public boolean isIncomplete() { return incomplete; }
