@@ -6,12 +6,16 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 /**
  * Exchange rate for currency conversion.
+ * Can be company-specific or system-wide (company_id = null).
  * Default: 1 USD = 4000 KHR
  */
 @Entity
@@ -45,6 +49,10 @@ public class ExchangeRate extends AuditableEntity {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id")
+    private Company company;
+
     // Getters and setters
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
@@ -66,4 +74,7 @@ public class ExchangeRate extends AuditableEntity {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public Company getCompany() { return company; }
+    public void setCompany(Company company) { this.company = company; }
 }
