@@ -1,0 +1,683 @@
+{
+	"info": {
+		"_postman_id": "delivery-api-collection",
+		"name": "Delivery API",
+		"description": "Complete API collection for Delivery API with authentication, user management, company management, deliveries, products, and customer management",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Request OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phone\": \"012345678\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/request-otp",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "request-otp"]
+						}
+					}
+				},
+				{
+					"name": "Verify OTP",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('token', jsonData.accessToken);",
+									"    pm.environment.set('refresh_token', jsonData.refreshToken);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phone\": \"012345678\",\n  \"otp\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/verify-otp",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "verify-otp"]
+						}
+					}
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('token', jsonData.accessToken);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/refresh",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "refresh"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "User Management",
+			"item": [
+				{
+					"name": "Get Current User",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/users/me",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "me"]
+						}
+					}
+				},
+				{
+					"name": "Update User Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"displayName\": \"John Doe\",\n  \"email\": \"john@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/users/me",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "me"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Company Management",
+			"item": [
+				{
+					"name": "Get Company Categories",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/company-categories",
+							"host": ["{{base_url}}"],
+							"path": ["api", "company-categories"]
+						}
+					}
+				},
+				{
+					"name": "Create Company",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"companyName\": \"My Delivery Company\",\n  \"categoryCode\": \"DELIVERY\",\n  \"address\": \"123 Main Street\",\n  \"provinceId\": \"province-uuid\",\n  \"districtId\": \"district-uuid\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/companies",
+							"host": ["{{base_url}}"],
+							"path": ["api", "companies"]
+						}
+					}
+				},
+				{
+					"name": "Get My Company",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/companies/me",
+							"host": ["{{base_url}}"],
+							"path": ["api", "companies", "me"]
+						}
+					}
+				},
+				{
+					"name": "Update Company",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"companyName\": \"Updated Company Name\",\n  \"address\": \"456 New Street\",\n  \"provinceId\": \"province-uuid\",\n  \"districtId\": \"district-uuid\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/companies/{{company_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "companies", "{{company_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Browse Companies",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/companies/browse?page=0&size=20",
+							"host": ["{{base_url}}"],
+							"path": ["api", "companies", "browse"],
+							"query": [
+								{
+									"key": "page",
+									"value": "0"
+								},
+								{
+									"key": "size",
+									"value": "20"
+								},
+								{
+									"key": "categoryCode",
+									"value": "DELIVERY",
+									"disabled": true
+								},
+								{
+									"key": "search",
+									"value": "company name",
+									"disabled": true
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Geographic Data",
+			"item": [
+				{
+					"name": "Get Provinces",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/provinces",
+							"host": ["{{base_url}}"],
+							"path": ["api", "provinces"]
+						}
+					}
+				},
+				{
+					"name": "Get Districts by Province",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/provinces/{{province_id}}/districts",
+							"host": ["{{base_url}}"],
+							"path": ["api", "provinces", "{{province_id}}", "districts"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Product Management",
+			"item": [
+				{
+					"name": "Get Product Categories",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/product-categories",
+							"host": ["{{base_url}}"],
+							"path": ["api", "product-categories"]
+						}
+					}
+				},
+				{
+					"name": "Create Product",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Sample Product\",\n  \"description\": \"Product description\",\n  \"categoryId\": \"category-uuid\",\n  \"price\": 25.50,\n  \"weight\": 1.5\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/products",
+							"host": ["{{base_url}}"],
+							"path": ["api", "products"]
+						}
+					}
+				},
+				{
+					"name": "Get My Products",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/products?page=0&size=20",
+							"host": ["{{base_url}}"],
+							"path": ["api", "products"],
+							"query": [
+								{
+									"key": "page",
+									"value": "0"
+								},
+								{
+									"key": "size",
+									"value": "20"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Customer Management",
+			"item": [
+				{
+					"name": "List Customers",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/customers?search=",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customers"],
+							"query": [
+								{
+									"key": "search",
+									"value": ""
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Customer Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/customers/{{customer_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customers", "{{customer_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Create Customer",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phone\": \"012345678\",\n  \"name\": \"John Doe\",\n  \"address\": \"Street 123\",\n  \"provinceId\": \"province-uuid\",\n  \"districtId\": \"district-uuid\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/customers",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customers"]
+						}
+					}
+				},
+				{
+					"name": "Update Customer",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Updated Name\",\n  \"address\": \"Updated Address\",\n  \"provinceId\": \"province-uuid\",\n  \"districtId\": \"district-uuid\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/customers/{{customer_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customers", "{{customer_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Verify Customer Before Delivery",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"receiverPhone\": \"012345678\",\n  \"receiverName\": \"John Doe\",\n  \"deliveryAddress\": \"Street 123\",\n  \"deliveryProvinceId\": \"province-uuid\",\n  \"deliveryDistrictId\": \"district-uuid\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/deliveries/verify-customer",
+							"host": ["{{base_url}}"],
+							"path": ["api", "deliveries", "verify-customer"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Delivery Management",
+			"item": [
+				{
+					"name": "Create Delivery",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"receiverPhone\": \"012345678\",\n  \"receiverName\": \"John Doe\",\n  \"deliveryAddress\": \"Street 123, Phnom Penh\",\n  \"deliveryProvinceId\": \"province-uuid\",\n  \"deliveryDistrictId\": \"district-uuid\",\n  \"productId\": \"product-uuid\",\n  \"quantity\": 2,\n  \"notes\": \"Handle with care\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/deliveries",
+							"host": ["{{base_url}}"],
+							"path": ["api", "deliveries"]
+						}
+					}
+				},
+				{
+					"name": "Get My Deliveries",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/deliveries?page=0&size=20",
+							"host": ["{{base_url}}"],
+							"path": ["api", "deliveries"],
+							"query": [
+								{
+									"key": "page",
+									"value": "0"
+								},
+								{
+									"key": "size",
+									"value": "20"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Delivery Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/deliveries/{{delivery_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "deliveries", "{{delivery_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Update Delivery Status",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"PICKED_UP\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/deliveries/{{delivery_id}}/status",
+							"host": ["{{base_url}}"],
+							"path": ["api", "deliveries", "{{delivery_id}}", "status"]
+						}
+					}
+				},
+				{
+					"name": "Get Receiver Suggestions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/deliveries/receiver-suggestions/012345678",
+							"host": ["{{base_url}}"],
+							"path": ["api", "deliveries", "receiver-suggestions", "012345678"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Pricing",
+			"item": [
+				{
+					"name": "Get Delivery Pricing Rules",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/pricing/rules",
+							"host": ["{{base_url}}"],
+							"path": ["api", "pricing", "rules"]
+						}
+					}
+				},
+				{
+					"name": "Calculate Delivery Price",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fromProvinceId\": \"province-uuid-1\",\n  \"toProvinceId\": \"province-uuid-2\",\n  \"weight\": 2.5\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/pricing/calculate",
+							"host": ["{{base_url}}"],
+							"path": ["api", "pricing", "calculate"]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8081",
+			"type": "string"
+		}
+	]
+}
