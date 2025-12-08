@@ -432,6 +432,8 @@ public class AuthController {
                 } else {
                     // Create new company and make user OWNER
                     Company company = new Company(companyNameTrimmed);
+                    company.setCreatedByUser(user);
+                    // Don't set createdByCompany for user's own company (self-created)
                     company = companyRepository.save(company);
                     user.setCompany(company);
                     user.setUserRole(UserRole.OWNER);

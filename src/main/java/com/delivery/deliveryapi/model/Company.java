@@ -24,7 +24,7 @@ import jakarta.persistence.UniqueConstraint;
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Table(name = "companies",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_companies_name", columnNames = {"name"})
+        @UniqueConstraint(name = "uk_companies_name_created_by", columnNames = {"name", "created_by_company_id"})
     },
     indexes = {
         @Index(name = "idx_companies_created_at", columnList = "created_at"),
@@ -43,9 +43,29 @@ public class Company {
     @Column(name = "address", columnDefinition = "TEXT")
     private String address;
 
+    @Column(name = "district_id")
+    private UUID districtId;
+
+    @Column(name = "province_id")
+    private UUID provinceId;
+
+    @Column(name = "category_id")
+    private UUID categoryId;
+
+    @Column(name = "phone_number", length = 20)
+    private String phoneNumber;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "district_id")
-    private District district;
+    @JoinColumn(name = "created_by_user_id")
+    private User createdByUser;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "updated_by_user_id")
+    private User updatedByUser;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_company_id")
+    private Company createdByCompany;
 
     @Column(name = "active", nullable = false)
     private boolean active = true;
@@ -69,12 +89,28 @@ public class Company {
     public void setName(String name) { this.name = name; }
     public String getAddress() { return address; }
     public void setAddress(String address) { this.address = address; }
-    public District getDistrict() { return district; }
-    public void setDistrict(District district) { this.district = district; }
+    public UUID getDistrictId() { return districtId; }
+    public void setDistrictId(UUID districtId) { this.districtId = districtId; }
+    public UUID getProvinceId() { return provinceId; }
+    public void setProvinceId(UUID provinceId) { this.provinceId = provinceId; }
+    public UUID getCategoryId() { return categoryId; }
+    public void setCategoryId(UUID categoryId) { this.categoryId = categoryId; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
+
+    public String getPhoneNumber() { return phoneNumber; }
+    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
+
+    public User getCreatedByUser() { return createdByUser; }
+    public void setCreatedByUser(User createdByUser) { this.createdByUser = createdByUser; }
+
+    public User getUpdatedByUser() { return updatedByUser; }
+    public void setUpdatedByUser(User updatedByUser) { this.updatedByUser = updatedByUser; }
+
+    public Company getCreatedByCompany() { return createdByCompany; }
+    public void setCreatedByCompany(Company createdByCompany) { this.createdByCompany = createdByCompany; }
 
     @PrePersist
     @PreUpdate

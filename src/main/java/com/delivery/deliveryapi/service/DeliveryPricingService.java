@@ -42,8 +42,9 @@ public class DeliveryPricingService {
     }
 
     @Transactional
-    public DeliveryPricingRule updatePricingRule(UUID ruleId, String ruleName, BigDecimal baseFee,
-                                                BigDecimal highValueSurcharge, BigDecimal highValueThreshold) {
+    public DeliveryPricingRule updatePricingRule(UUID ruleId, String ruleName, String province, String district,
+                                                BigDecimal baseFee, BigDecimal highValueSurcharge, 
+                                                BigDecimal highValueThreshold, Integer priority) {
         Optional<DeliveryPricingRule> optRule = pricingRuleRepository.findById(ruleId);
         if (optRule.isEmpty()) {
             throw new IllegalArgumentException("Pricing rule not found");
@@ -51,9 +52,12 @@ public class DeliveryPricingService {
 
         DeliveryPricingRule rule = optRule.get();
         if (ruleName != null) rule.setRuleName(ruleName);
+        if (province != null) rule.setProvince(province);
+        if (district != null) rule.setDistrict(district);
         if (baseFee != null) rule.setBaseFee(baseFee);
         if (highValueSurcharge != null) rule.setHighValueSurcharge(highValueSurcharge);
         if (highValueThreshold != null) rule.setHighValueThreshold(highValueThreshold);
+        if (priority != null) rule.setPriority(priority);
 
         return pricingRuleRepository.save(rule);
     }
@@ -75,6 +79,19 @@ public class DeliveryPricingService {
 
     public List<DeliveryPricingRule> getUserPricingRules(User user) {
         return pricingRuleRepository.findByCompanyAndIsActive(user.getCompany(), true);
+    }
+
+    public DeliveryPricingRule findMatchingRule(User user, String province, String district, BigDecimal totalPrice) {
+        // Find applicable pricing rules for the delivery location
+        List<DeliveryPricingRule> applicableRules = pricingRuleRepository
+            .findApplicableRules(user.getCompany(), province, district);
+
+        if (!applicableRules.isEmpty()) {
+            // Return the highest priority rule (first in the list)
+            return applicableRules.get(0);
+        }
+
+        return null;
     }
 
     public BigDecimal calculateDeliveryFee(User user, CreateDeliveryRequest request) {

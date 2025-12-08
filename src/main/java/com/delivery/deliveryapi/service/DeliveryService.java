@@ -17,14 +17,19 @@ import com.delivery.deliveryapi.model.DeliveryItem;
 import com.delivery.deliveryapi.model.DeliveryPackage;
 import com.delivery.deliveryapi.model.DeliveryPackageStatus;
 import com.delivery.deliveryapi.model.DeliveryPhoto;
+import com.delivery.deliveryapi.model.District;
 import com.delivery.deliveryapi.model.Product;
+import com.delivery.deliveryapi.model.Province;
 import com.delivery.deliveryapi.model.User;
 import com.delivery.deliveryapi.model.UserType;
+import com.delivery.deliveryapi.repo.CompanyCategoryRepository;
 import com.delivery.deliveryapi.repo.CompanyRepository;
 import com.delivery.deliveryapi.repo.DeliveryItemRepository;
 import com.delivery.deliveryapi.repo.DeliveryPhotoRepository;
 import com.delivery.deliveryapi.repo.DeliveryTrackingRepository;
+import com.delivery.deliveryapi.repo.DistrictRepository;
 import com.delivery.deliveryapi.repo.ProductRepository;
+import com.delivery.deliveryapi.repo.ProvinceRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
 
 import jakarta.persistence.EntityManager;
@@ -39,8 +44,11 @@ public class DeliveryService {
     private final DeliveryItemRepository deliveryItemRepository;
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
+    private final CompanyCategoryRepository companyCategoryRepository;
     private final DeliveryPhotoRepository deliveryPhotoRepository;
     private final DeliveryTrackingRepository deliveryTrackingRepository;
+    private final DistrictRepository districtRepository;
+    private final ProvinceRepository provinceRepository;
     private final DeliveryPricingService deliveryPricingService;
     private final ProductService productService;
     private final ProductRepository productRepository;
@@ -50,8 +58,11 @@ public class DeliveryService {
     public DeliveryService(DeliveryItemRepository deliveryItemRepository,
                           UserRepository userRepository,
                           CompanyRepository companyRepository,
+                          CompanyCategoryRepository companyCategoryRepository,
                           DeliveryPhotoRepository deliveryPhotoRepository,
                           DeliveryTrackingRepository deliveryTrackingRepository,
+                          DistrictRepository districtRepository,
+                          ProvinceRepository provinceRepository,
                           DeliveryPricingService deliveryPricingService,
                           ProductService productService,
                           ProductRepository productRepository,
@@ -60,8 +71,11 @@ public class DeliveryService {
         this.deliveryItemRepository = deliveryItemRepository;
         this.userRepository = userRepository;
         this.companyRepository = companyRepository;
+        this.companyCategoryRepository = companyCategoryRepository;
         this.deliveryPhotoRepository = deliveryPhotoRepository;
         this.deliveryTrackingRepository = deliveryTrackingRepository;
+        this.districtRepository = districtRepository;
+        this.provinceRepository = provinceRepository;
         this.deliveryPricingService = deliveryPricingService;
         this.productService = productService;
         this.productRepository = productRepository;
@@ -92,7 +106,7 @@ public class DeliveryService {
         boolean autoCreatedDriver = false;
 
         if (DELIVERY_TYPE_COMPANY.equalsIgnoreCase(request.getDeliveryType())) {
-            deliveryCompany = findOrCreateCompany(request.getCompanyName());
+            deliveryCompany = findOrCreateCompany(request.getCompanyName(), request.getCompanyPhone(), sender, sender.getCompany());
             autoCreatedCompany = true;
             log.info("Using delivery company: {} ({})", deliveryCompany.getId(), deliveryCompany.getName());
         } else if (DELIVERY_TYPE_DRIVER.equalsIgnoreCase(request.getDeliveryType())) {
@@ -111,13 +125,16 @@ public class DeliveryService {
             pickupAddress = sender.getCompany().getAddress();
         }
         if ((pickupProvince == null || pickupProvince.trim().isEmpty()) &&
-            sender.getCompany() != null && sender.getCompany().getDistrict() != null &&
-            sender.getCompany().getDistrict().getProvince() != null) {
-            pickupProvince = sender.getCompany().getDistrict().getProvince().getName();
+            sender.getCompany() != null && sender.getCompany().getProvinceId() != null) {
+            pickupProvince = provinceRepository.findById(sender.getCompany().getProvinceId())
+                .map(Province::getName)
+                .orElse(null);
         }
         if ((pickupDistrict == null || pickupDistrict.trim().isEmpty()) &&
-            sender.getCompany() != null && sender.getCompany().getDistrict() != null) {
-            pickupDistrict = sender.getCompany().getDistrict().getName();
+            sender.getCompany() != null && sender.getCompany().getDistrictId() != null) {
+            pickupDistrict = districtRepository.findById(sender.getCompany().getDistrictId())
+                .map(District::getName)
+                .orElse(null);
         }
 
         // Calculate or use provided delivery fee (ONE FEE for entire delivery, all items)
@@ -468,7 +485,7 @@ public class DeliveryService {
         User deliveryDriver = context.getDeliveryDriver();
 
         if ("COMPANY".equalsIgnoreCase(request.getDeliveryType()) && request.getCompanyName() != null) {
-            deliveryCompany = findOrCreateCompany(request.getCompanyName());
+            deliveryCompany = findOrCreateCompany(request.getCompanyName(), request.getCompanyPhone(), sender, sender.getCompany());
             deliveryDriver = null;
         } else if ("DRIVER".equalsIgnoreCase(request.getDeliveryType()) && request.getDriverPhone() != null) {
             deliveryDriver = findOrCreateDriver(request.getDriverPhone());
@@ -700,18 +717,25 @@ public class DeliveryService {
         return userRepository.save(receiver);
     }
 
-    private Company findOrCreateCompany(String name) {
-        // Try to find existing company by name
-        Optional<Company> existingCompany = companyRepository.findByName(name);
+    private Company findOrCreateCompany(String name, String phone, User createdByUser, Company createdByCompany) {
+        // Try to find existing company by name AND creator company (unique constraint)
+        Optional<Company> existingCompany = companyRepository.findByNameAndCreatedByCompany(name, createdByCompany);
         if (existingCompany.isPresent()) {
-            // Return existing company - name doesn't need updating since we search by name
+            // Return existing company
             return existingCompany.get();
         }
 
         // Create new company
         Company company = new Company();
         company.setName(name);
+        company.setPhoneNumber(phone);
         company.setActive(true);
+        company.setCreatedByUser(createdByUser);
+        company.setCreatedByCompany(createdByCompany);
+        
+        // Set default category to "DELIVERY"
+        var deliveryCategory = companyCategoryRepository.findByCode("DELIVERY");
+        deliveryCategory.ifPresent(cat -> company.setCategoryId(cat.getId()));
 
         return companyRepository.save(company);
     }

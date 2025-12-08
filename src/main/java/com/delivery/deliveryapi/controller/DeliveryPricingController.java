@@ -102,9 +102,12 @@ public class DeliveryPricingController {
             var rule = pricingService.updatePricingRule(
                 ruleId,
                 request.getRuleName(),
+                request.getProvince(),
+                request.getDistrict(),
                 request.getBaseFee(),
                 request.getHighValueSurcharge(),
-                request.getHighValueThreshold()
+                request.getHighValueThreshold(),
+                request.getPriority()
             );
 
             return ResponseEntity.ok(new PricingRuleResponse(rule));
@@ -151,6 +154,28 @@ public class DeliveryPricingController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(new PricingBreakdownResponse("Error: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/find-rule")
+    public ResponseEntity<FindRuleResponse> findMatchingRule(
+            @org.springframework.web.bind.annotation.RequestParam(required = true) String province,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String district,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) BigDecimal totalPrice) {
+        try {
+            User currentUser = getCurrentUser();
+
+            var matchedRule = pricingService.findMatchingRule(currentUser, province, district, totalPrice);
+
+            if (matchedRule != null) {
+                return ResponseEntity.ok(new FindRuleResponse(matchedRule, totalPrice));
+            } else {
+                return ResponseEntity.ok(new FindRuleResponse("No matching pricing rule found"));
+            }
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new FindRuleResponse("Error: " + e.getMessage()));
         }
     }
 
@@ -228,6 +253,12 @@ public class DeliveryPricingController {
         @JsonProperty("ruleName")
         private String ruleName;
 
+        @JsonProperty("province")
+        private String province;
+
+        @JsonProperty("district")
+        private String district;
+
         @JsonProperty("baseFee")
         private java.math.BigDecimal baseFee;
 
@@ -237,9 +268,18 @@ public class DeliveryPricingController {
         @JsonProperty("highValueThreshold")
         private java.math.BigDecimal highValueThreshold;
 
+        @JsonProperty("priority")
+        private Integer priority;
+
         // Getters and setters
         public String getRuleName() { return ruleName; }
         public void setRuleName(String ruleName) { this.ruleName = ruleName; }
+
+        public String getProvince() { return province; }
+        public void setProvince(String province) { this.province = province; }
+
+        public String getDistrict() { return district; }
+        public void setDistrict(String district) { this.district = district; }
 
         public java.math.BigDecimal getBaseFee() { return baseFee; }
         public void setBaseFee(java.math.BigDecimal baseFee) { this.baseFee = baseFee; }
@@ -249,6 +289,9 @@ public class DeliveryPricingController {
 
         public java.math.BigDecimal getHighValueThreshold() { return highValueThreshold; }
         public void setHighValueThreshold(java.math.BigDecimal highValueThreshold) { this.highValueThreshold = highValueThreshold; }
+
+        public Integer getPriority() { return priority; }
+        public void setPriority(Integer priority) { this.priority = priority; }
     }
 
     public static class PricingRuleResponse {
@@ -372,6 +415,73 @@ public class DeliveryPricingController {
         public java.math.BigDecimal getItemCost() { return itemCost; }
         public java.math.BigDecimal getDeliveryFee() { return deliveryFee; }
         public java.math.BigDecimal getTotalCost() { return totalCost; }
+        public String getError() { return error; }
+    }
+
+    public static class FindRuleResponse {
+        @JsonProperty("ruleId")
+        private String ruleId;
+
+        @JsonProperty("ruleName")
+        private String ruleName;
+
+        @JsonProperty("province")
+        private String province;
+
+        @JsonProperty("district")
+        private String district;
+
+        @JsonProperty("baseFee")
+        private java.math.BigDecimal baseFee;
+
+        @JsonProperty("highValueSurcharge")
+        private java.math.BigDecimal highValueSurcharge;
+
+        @JsonProperty("highValueThreshold")
+        private java.math.BigDecimal highValueThreshold;
+
+        @JsonProperty("priority")
+        private Integer priority;
+
+        @JsonProperty("calculatedFee")
+        private java.math.BigDecimal calculatedFee;
+
+        @JsonProperty("error")
+        private String error;
+
+        public FindRuleResponse(com.delivery.deliveryapi.model.DeliveryPricingRule rule, java.math.BigDecimal totalPrice) {
+            this.ruleId = rule.getId().toString();
+            this.ruleName = rule.getRuleName();
+            this.province = rule.getProvince();
+            this.district = rule.getDistrict();
+            this.baseFee = rule.getBaseFee();
+            this.highValueSurcharge = rule.getHighValueSurcharge();
+            this.highValueThreshold = rule.getHighValueThreshold();
+            this.priority = rule.getPriority();
+
+            // Calculate fee based on total price
+            java.math.BigDecimal fee = rule.getBaseFee();
+            if (totalPrice != null && rule.getHighValueThreshold() != null &&
+                totalPrice.compareTo(rule.getHighValueThreshold()) > 0) {
+                fee = fee.add(rule.getHighValueSurcharge() != null ? rule.getHighValueSurcharge() : java.math.BigDecimal.ZERO);
+            }
+            this.calculatedFee = fee.setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+
+        public FindRuleResponse(String error) {
+            this.error = error;
+        }
+
+        // Getters
+        public String getRuleId() { return ruleId; }
+        public String getRuleName() { return ruleName; }
+        public String getProvince() { return province; }
+        public String getDistrict() { return district; }
+        public java.math.BigDecimal getBaseFee() { return baseFee; }
+        public java.math.BigDecimal getHighValueSurcharge() { return highValueSurcharge; }
+        public java.math.BigDecimal getHighValueThreshold() { return highValueThreshold; }
+        public Integer getPriority() { return priority; }
+        public java.math.BigDecimal getCalculatedFee() { return calculatedFee; }
         public String getError() { return error; }
     }
 }
