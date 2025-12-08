@@ -30,12 +30,17 @@ echo
 # Interactive menu for module selection
 echo "Select modules to reset (separate with spaces, e.g., '1 3 5'):"
 echo "========================================"
-echo "0) FULL RESET - Delete ALL data (CAUTION!)"
+echo "0) FULL RESET - Delete ALL data except settings (CAUTION!)"
 echo "1) AUTHENTICATION MODULE - OTP, Telegram, JWT data"
-echo "2) USER MANAGEMENT MODULE - Profiles, audit trails"
+echo "2) USER MANAGEMENT MODULE - Users, profiles, audit trails"
 echo "3) COMPANY MANAGEMENT MODULE - Companies, employees"
-echo "4) PRICING MODULE - Delivery pricing rules"
-echo "5) DELIVERY PACKAGE MODULE - Package tracking (future)"
+echo "4) DELIVERY MODULE - Deliveries, tracking, photos"
+echo "5) PRODUCT MODULE - Products, photos"
+echo "6) CUSTOMER MODULE - Customer records"
+echo "7) PRICING MODULE - Delivery pricing rules"
+echo "========================================"
+echo "Settings PRESERVED: Provinces, Districts, Company Categories,"
+echo "                    Product Categories, Exchange Rates"
 echo "========================================"
 echo "Enter your choice(s) or 'q' to quit:"
 
@@ -80,61 +85,102 @@ SET session_replication_role = 'replica';
 
 # Add TRUNCATE statements based on selections
 if echo "$choices" | grep -q '^0$\|^.* 0 .*\|^0 '; then
-    # Full reset - all modules
+    # Full reset - all modules except settings
     SQL_CONTENT+="
--- FULL RESET: Clearing all modules
-TRUNCATE TABLE auth_identities CASCADE;
-TRUNCATE TABLE otp_attempts CASCADE;
-TRUNCATE TABLE user_phones CASCADE;
-TRUNCATE TABLE user_audits CASCADE;
-TRUNCATE TABLE companies CASCADE;
-TRUNCATE TABLE employees CASCADE;
-TRUNCATE TABLE company_invitations CASCADE;
-TRUNCATE TABLE pending_employees CASCADE;
-TRUNCATE TABLE delivery_pricing_rules CASCADE;
--- TRUNCATE TABLE delivery_packages CASCADE;  -- Future module
--- TRUNCATE TABLE package_tracking CASCADE;   -- Future module
--- TRUNCATE TABLE package_status_history CASCADE; -- Future module
+-- FULL RESET: Clearing all user data (preserving settings)
+-- Note: Using DELETE instead of TRUNCATE CASCADE to preserve reference tables
+
+-- Deliveries (delete first due to foreign keys)
+DELETE FROM delivery_photos;
+DELETE FROM delivery_tracking;
+DELETE FROM delivery_items;
+
+-- Products (preserve product_categories - it's a setting)
+DELETE FROM product_photos;
+DELETE FROM products;
+
+-- Companies (preserve company_categories - it's a setting)
+DELETE FROM companies;
+DELETE FROM employees;
+DELETE FROM company_invitations;
+DELETE FROM pending_employees;
+
+-- Users and Customers
+DELETE FROM user_audits;
+DELETE FROM users WHERE user_type = 'CUSTOMER';
+DELETE FROM users;  -- Delete all remaining users
+
+-- Authentication
+DELETE FROM auth_identities;
+DELETE FROM otp_attempts;
+DELETE FROM user_phones;
+
+-- Pricing
+DELETE FROM delivery_pricing_rules;
+
+-- Settings PRESERVED: 
+-- - provinces, districts (geographic data)
+-- - company_categories (company types/industries)
+-- - product_categories (product classification)
+-- - exchange_rates (currency conversion rates)
 "
 elif echo "$choices" | grep -q '1'; then
     SQL_CONTENT+="
 -- AUTHENTICATION MODULE
-TRUNCATE TABLE auth_identities CASCADE;
-TRUNCATE TABLE otp_attempts CASCADE;
-TRUNCATE TABLE user_phones CASCADE;
+DELETE FROM auth_identities;
+DELETE FROM otp_attempts;
+DELETE FROM user_phones;
 "
 fi
 
 if echo "$choices" | grep -q '2'; then
     SQL_CONTENT+="
 -- USER MANAGEMENT MODULE
-TRUNCATE TABLE user_audits CASCADE;
+DELETE FROM user_audits;
+DELETE FROM users;  -- Deletes all users including non-customers
 "
 fi
 
 if echo "$choices" | grep -q '3'; then
     SQL_CONTENT+="
 -- COMPANY MANAGEMENT MODULE
-TRUNCATE TABLE companies CASCADE;
-TRUNCATE TABLE employees CASCADE;
-TRUNCATE TABLE company_invitations CASCADE;
-TRUNCATE TABLE pending_employees CASCADE;
+DELETE FROM companies;
+DELETE FROM employees;
+DELETE FROM company_invitations;
+DELETE FROM pending_employees;
+-- Note: company_categories preserved (it's a setting)
 "
 fi
 
 if echo "$choices" | grep -q '4'; then
     SQL_CONTENT+="
--- PRICING MODULE
-TRUNCATE TABLE delivery_pricing_rules CASCADE;
+-- DELIVERY MODULE
+DELETE FROM delivery_photos;
+DELETE FROM delivery_tracking;
+DELETE FROM delivery_items;
 "
 fi
 
 if echo "$choices" | grep -q '5'; then
     SQL_CONTENT+="
--- DELIVERY PACKAGE MODULE (future)
--- TRUNCATE TABLE delivery_packages CASCADE;
--- TRUNCATE TABLE package_tracking CASCADE;
--- TRUNCATE TABLE package_status_history CASCADE;
+-- PRODUCT MODULE
+DELETE FROM product_photos;
+DELETE FROM products;
+-- Note: product_categories preserved (it's a setting)
+"
+fi
+
+if echo "$choices" | grep -q '6'; then
+    SQL_CONTENT+="
+-- CUSTOMER MODULE
+DELETE FROM users WHERE user_type = 'CUSTOMER';
+"
+fi
+
+if echo "$choices" | grep -q '7'; then
+    SQL_CONTENT+="
+-- PRICING MODULE
+DELETE FROM delivery_pricing_rules;
 "
 fi
 
@@ -154,9 +200,17 @@ FROM auth_identities
 UNION ALL
 SELECT 'companies', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRESERVED' END FROM companies
 UNION ALL
+SELECT 'company_categories', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRESERVED' END FROM company_categories
+UNION ALL
 SELECT 'company_invitations', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRESERVED' END FROM company_invitations
 UNION ALL
+SELECT 'delivery_items', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRESERVED' END FROM delivery_items
+UNION ALL
+SELECT 'delivery_photos', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRESERVED' END FROM delivery_photos
+UNION ALL
 SELECT 'delivery_pricing_rules', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRESERVED' END FROM delivery_pricing_rules
+UNION ALL
+SELECT 'delivery_tracking', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRESERVED' END FROM delivery_tracking
 UNION ALL
 SELECT 'employees', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRESERVED' END FROM employees
 UNION ALL
@@ -164,18 +218,37 @@ SELECT 'otp_attempts', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRE
 UNION ALL
 SELECT 'pending_employees', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRESERVED' END FROM pending_employees
 UNION ALL
+SELECT 'products', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRESERVED' END FROM products
+UNION ALL
+SELECT 'product_categories', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRESERVED' END FROM product_categories
+UNION ALL
+SELECT 'product_photos', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRESERVED' END FROM product_photos
+UNION ALL
 SELECT 'user_audits', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRESERVED' END FROM user_audits
 UNION ALL
 SELECT 'user_phones', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRESERVED' END FROM user_phones
 UNION ALL
 SELECT 'users', COUNT(*), CASE WHEN COUNT(*) = 0 THEN 'CLEARED' ELSE 'PRESERVED' END FROM users
+UNION ALL
+SELECT 'customers (CUSTOMER type)', (SELECT COUNT(*) FROM users WHERE user_type = 'CUSTOMER'), 
+       CASE WHEN (SELECT COUNT(*) FROM users WHERE user_type = 'CUSTOMER') = 0 THEN 'CLEARED' ELSE 'PRESERVED' END
+UNION ALL
+SELECT 'provinces (settings)', COUNT(*), 'PRESERVED' FROM provinces
+UNION ALL
+SELECT 'districts (settings)', COUNT(*), 'PRESERVED' FROM districts
+UNION ALL
+SELECT 'company_categories (settings)', COUNT(*), 'PRESERVED' FROM company_categories
+UNION ALL
+SELECT 'product_categories (settings)', COUNT(*), 'PRESERVED' FROM product_categories
+UNION ALL
+SELECT 'exchange_rates (settings)', COUNT(*), 'PRESERVED' FROM exchange_rates
 ORDER BY table_name;
 "
 
 # Ask for confirmation
 echo "This will reset the following modules:"
 if echo "$choices" | grep -q '^0$\|^.* 0 .*\|^0 '; then
-    echo "  - FULL RESET (ALL DATA)"
+    echo "  - FULL RESET (ALL USER DATA - Settings Preserved)"
 elif echo "$choices" | grep -q '1'; then
     echo "  - Authentication Module"
 fi
@@ -186,10 +259,16 @@ if echo "$choices" | grep -q '3'; then
     echo "  - Company Management Module"
 fi
 if echo "$choices" | grep -q '4'; then
-    echo "  - Pricing Module"
+    echo "  - Delivery Module"
 fi
 if echo "$choices" | grep -q '5'; then
-    echo "  - Delivery Package Module (future)"
+    echo "  - Product Module"
+fi
+if echo "$choices" | grep -q '6'; then
+    echo "  - Customer Module"
+fi
+if echo "$choices" | grep -q '7'; then
+    echo "  - Pricing Module"
 fi
 
 echo
