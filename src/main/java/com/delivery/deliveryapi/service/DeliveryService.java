@@ -692,18 +692,14 @@ public class DeliveryService {
     private User findOrCreateReceiver(String phone, String name) {
         String normalizedPhone = normalizePhone(phone);
 
+        // For backwards compatibility during migration, search globally first
         Optional<User> existingUser = userRepository.findByPhoneE164(normalizedPhone);
         if (existingUser.isPresent()) {
-            User receiver = existingUser.get();
-            // Update display name if provided and different
-            if (name != null && !name.trim().isEmpty() && !name.trim().equals(receiver.getDisplayName())) {
-                receiver.setDisplayName(name.trim());
-                return userRepository.save(receiver);
-            }
-            return receiver;
+            // Return existing customer WITHOUT updating any fields
+            return existingUser.get();
         }
 
-        // Create unverified receiver
+        // Create new receiver (will be migrated to company-scoped in future deliveries)
         User receiver = new User();
         receiver.setPhoneE164(normalizedPhone);
         receiver.setUserType(UserType.CUSTOMER);

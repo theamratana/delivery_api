@@ -33,7 +33,12 @@ public interface DeliveryItemRepository extends JpaRepository<DeliveryItem, UUID
     @Query("SELECT d FROM DeliveryItem d WHERE d.receiver IS NOT NULL AND d.receiver.phoneE164 = :phone AND d.deleted = false ORDER BY d.updatedAt DESC")
     List<DeliveryItem> findByReceiverPhone(@Param("phone") String phone);
 
+    @Query("SELECT d FROM DeliveryItem d WHERE d.receiver IS NOT NULL AND d.receiver.phoneE164 = :phone AND d.sender.company.id = :companyId AND d.deleted = false ORDER BY d.updatedAt DESC")
+    List<DeliveryItem> findByReceiverPhoneAndSenderCompany(@Param("phone") String phone, @Param("companyId") UUID companyId);
+
     long countBySenderIdAndDeletedFalse(UUID senderId);
+
+    long countByReceiverIdAndDeletedFalse(UUID receiverId);
 
     long countByStatusAndDeletedFalse(DeliveryStatus status);
 

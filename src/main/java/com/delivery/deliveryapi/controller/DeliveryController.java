@@ -29,7 +29,10 @@ import com.delivery.deliveryapi.model.DeliveryItem;
 import com.delivery.deliveryapi.model.DeliveryPhoto;
 import com.delivery.deliveryapi.model.DeliveryStatus;
 import com.delivery.deliveryapi.model.DeliveryTracking;
+import com.delivery.deliveryapi.model.District;
+import com.delivery.deliveryapi.model.Province;
 import com.delivery.deliveryapi.model.User;
+import com.delivery.deliveryapi.model.UserType;
 import com.delivery.deliveryapi.repo.DeliveryItemRepository;
 import com.delivery.deliveryapi.repo.DeliveryPhotoRepository;
 import com.delivery.deliveryapi.repo.DeliveryTrackingRepository;
@@ -49,18 +52,24 @@ public class DeliveryController {
     private final DeliveryTrackingRepository deliveryTrackingRepository;
     private final DeliveryPhotoRepository deliveryPhotoRepository;
     private final UserRepository userRepository;
+    private final com.delivery.deliveryapi.repo.DistrictRepository districtRepository;
+    private final com.delivery.deliveryapi.repo.ProvinceRepository provinceRepository;
     private final ObjectMapper objectMapper;
 
     public DeliveryController(DeliveryService deliveryService,
                             DeliveryItemRepository deliveryItemRepository,
                             DeliveryTrackingRepository deliveryTrackingRepository,
                             DeliveryPhotoRepository deliveryPhotoRepository,
-                            UserRepository userRepository) {
+                            UserRepository userRepository,
+                            com.delivery.deliveryapi.repo.DistrictRepository districtRepository,
+                            com.delivery.deliveryapi.repo.ProvinceRepository provinceRepository) {
         this.deliveryService = deliveryService;
         this.deliveryItemRepository = deliveryItemRepository;
         this.deliveryTrackingRepository = deliveryTrackingRepository;
         this.deliveryPhotoRepository = deliveryPhotoRepository;
         this.userRepository = userRepository;
+        this.districtRepository = districtRepository;
+        this.provinceRepository = provinceRepository;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -165,6 +174,105 @@ public class DeliveryController {
             case DELIVERED -> "Receiver";
             default -> "Sender";
         };
+    }
+
+    @PostMapping("/verify-customer")
+    public ResponseEntity<CustomerVerificationResponse> verifyCustomer(@RequestBody VerifyCustomerRequest request) {
+        try {
+            // Get current user
+            var auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            UUID userId = UUID.fromString(userIdStr);
+            var optUser = userRepository.findById(userId);
+            if (optUser.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            User currentUser = optUser.get();
+            
+            if (currentUser.getCompany() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+            }
+
+            // Search for existing customer by phone + company
+            var existingCustomer = userRepository.findByPhoneE164AndCompanyAndUserType(
+                request.receiverPhone.trim(),
+                currentUser.getCompany(),
+                UserType.CUSTOMER
+            );
+
+            if (existingCustomer.isEmpty()) {
+                // New customer
+                return ResponseEntity.ok(new CustomerVerificationResponse(false, null, false, null, null));
+            }
+
+            User customer = existingCustomer.get();
+            CustomerInfo currentInfo = new CustomerInfo(
+                customer.getDisplayName(),
+                customer.getPhoneE164(),
+                customer.getDefaultAddress(),
+                customer.getDefaultProvinceId(),
+                customer.getDefaultDistrictId(),
+                customer.getDefaultProvinceId() != null ? 
+                    provinceRepository.findById(customer.getDefaultProvinceId()).map(Province::getName).orElse(null) : null,
+                customer.getDefaultDistrictId() != null ? 
+                    districtRepository.findById(customer.getDefaultDistrictId()).map(District::getName).orElse(null) : null
+            );
+
+            // Check for changes
+            Map<String, FieldChange> changes = new LinkedHashMap<>();
+            boolean hasChanges = false;
+
+            // Compare name
+            if (request.receiverName != null && !request.receiverName.trim().isEmpty()) {
+                if (customer.getDisplayName() == null || !request.receiverName.trim().equals(customer.getDisplayName())) {
+                    changes.put("name", new FieldChange(customer.getDisplayName(), request.receiverName.trim()));
+                    hasChanges = true;
+                }
+            }
+
+            // Compare address
+            if (request.deliveryAddress != null && !request.deliveryAddress.trim().isEmpty()) {
+                if (customer.getDefaultAddress() == null || !request.deliveryAddress.trim().equals(customer.getDefaultAddress())) {
+                    changes.put("address", new FieldChange(customer.getDefaultAddress(), request.deliveryAddress.trim()));
+                    hasChanges = true;
+                }
+            }
+
+            // Compare province (by ID)
+            if (request.deliveryProvinceId != null) {
+                if (customer.getDefaultProvinceId() == null || !request.deliveryProvinceId.equals(customer.getDefaultProvinceId())) {
+                    String oldProvinceName = customer.getDefaultProvinceId() != null ?
+                        provinceRepository.findById(customer.getDefaultProvinceId()).map(Province::getName).orElse(null) : null;
+                    String newProvinceName = provinceRepository.findById(request.deliveryProvinceId).map(Province::getName).orElse(null);
+                    changes.put("province", new FieldChange(oldProvinceName, newProvinceName));
+                    hasChanges = true;
+                }
+            }
+
+            // Compare district (by ID)
+            if (request.deliveryDistrictId != null) {
+                if (customer.getDefaultDistrictId() == null || !request.deliveryDistrictId.equals(customer.getDefaultDistrictId())) {
+                    String oldDistrictName = customer.getDefaultDistrictId() != null ?
+                        districtRepository.findById(customer.getDefaultDistrictId()).map(District::getName).orElse(null) : null;
+                    String newDistrictName = districtRepository.findById(request.deliveryDistrictId).map(District::getName).orElse(null);
+                    changes.put("district", new FieldChange(oldDistrictName, newDistrictName));
+                    hasChanges = true;
+                }
+            }
+
+            return ResponseEntity.ok(new CustomerVerificationResponse(
+                true,
+                customer.getId().toString(),
+                hasChanges,
+                currentInfo,
+                hasChanges ? changes : null
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
     }
 
     @PostMapping
@@ -426,10 +534,30 @@ public class DeliveryController {
     @GetMapping("/receiver-suggestions/{phone}")
     @Transactional
     public ResponseEntity<List<ReceiverSuggestion>> getReceiverSuggestions(@PathVariable String phone) {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID userId;
+        try {
+            userId = UUID.fromString(userIdStr);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        User currentUser = userRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (currentUser.getCompany() == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(List.of());
+        }
+
         String normalizedPhone = phone.replaceAll("\\s+", "").trim();
         
-        // Find all unique receivers with this phone number from delivery history
-        List<DeliveryItem> deliveries = deliveryItemRepository.findByReceiverPhone(normalizedPhone);
+        // Find deliveries from same company's delivery history only
+        List<DeliveryItem> deliveries = deliveryItemRepository
+            .findByReceiverPhoneAndSenderCompany(normalizedPhone, currentUser.getCompany().getId());
         
         if (deliveries.isEmpty()) {
             return ResponseEntity.ok(List.of());
@@ -1400,5 +1528,96 @@ public class DeliveryController {
         batch.setActualDeliveryCost(first.getActualDeliveryCost());
         batch.setKhrAmount(first.getKhrAmount());
         batch.setExchangeRateUsed(first.getExchangeRateUsed());
+    }
+
+    // Customer verification DTOs
+    public static class VerifyCustomerRequest {
+        @JsonProperty("receiverPhone")
+        public String receiverPhone;
+
+        @JsonProperty("receiverName")
+        public String receiverName;
+
+        @JsonProperty("deliveryAddress")
+        public String deliveryAddress;
+
+        @JsonProperty("deliveryProvinceId")
+        public UUID deliveryProvinceId;
+
+        @JsonProperty("deliveryDistrictId")
+        public UUID deliveryDistrictId;
+    }
+
+    public static class CustomerVerificationResponse {
+        @JsonProperty("exists")
+        public boolean exists;
+
+        @JsonProperty("customerId")
+        public String customerId;
+
+        @JsonProperty("hasChanges")
+        public boolean hasChanges;
+
+        @JsonProperty("currentInfo")
+        public CustomerInfo currentInfo;
+
+        @JsonProperty("changes")
+        public Map<String, FieldChange> changes;
+
+        public CustomerVerificationResponse(boolean exists, String customerId, boolean hasChanges, 
+                                          CustomerInfo currentInfo, Map<String, FieldChange> changes) {
+            this.exists = exists;
+            this.customerId = customerId;
+            this.hasChanges = hasChanges;
+            this.currentInfo = currentInfo;
+            this.changes = changes;
+        }
+    }
+
+    public static class CustomerInfo {
+        @JsonProperty("name")
+        public String name;
+
+        @JsonProperty("phone")
+        public String phone;
+
+        @JsonProperty("address")
+        public String address;
+
+        @JsonProperty("provinceId")
+        public UUID provinceId;
+
+        @JsonProperty("districtId")
+        public UUID districtId;
+
+        @JsonProperty("provinceName")
+        public String provinceName;
+
+        @JsonProperty("districtName")
+        public String districtName;
+
+        public CustomerInfo(String name, String phone, String address, UUID provinceId, 
+                          UUID districtId, String provinceName, String districtName) {
+            this.name = name;
+            this.phone = phone;
+            this.address = address;
+            this.provinceId = provinceId;
+            this.districtId = districtId;
+            this.provinceName = provinceName;
+            this.districtName = districtName;
+        }
+    }
+
+    public static class FieldChange {
+        @JsonProperty("old")
+        public String oldValue;
+
+        @JsonProperty("new")
+        public String newValue;
+
+        public FieldChange(String oldValue, String newValue) {
+            this.oldValue = oldValue;
+            this.newValue = newValue;
+        }
     }
 }
