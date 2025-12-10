@@ -327,9 +327,20 @@ public class AuthController {
         ));
     }
 
-    public record ProfileUpdateRequest(UserType userType, String firstName, String lastName, String displayName, String companyName, String avatarUrl) {}
+    public record ProfileUpdateRequest(
+        UserType userType, 
+        String firstName, 
+        String lastName, 
+        String displayName, 
+        String companyName, 
+        String avatarUrl,
+        String email,
+        String address,
+        UUID defaultProvinceId,
+        UUID defaultDistrictId
+    ) {}
 
-    public record ProfileResponse(UUID id, String displayName, String username, String firstName, String lastName, UserType userType, UserRole userRole, UUID companyId, String companyName, boolean incomplete, String avatarUrl, String phoneNumber) {}
+    public record ProfileResponse(UUID id, String displayName, String username, String firstName, String lastName, UserType userType, UserRole userRole, UUID companyId, String companyName, boolean incomplete, String avatarUrl, String phoneNumber, String email, String address, UUID defaultProvinceId, UUID defaultDistrictId) {}
 
     @GetMapping("/profile")
     @SuppressWarnings("null")
@@ -362,7 +373,11 @@ public class AuthController {
             user.getCompany() != null ? user.getCompany().getName() : null,
             user.isIncomplete(),
             user.getAvatarUrl(),
-            user.getPhoneE164()
+            user.getPhoneE164(),
+            user.getEmail(),
+            user.getDefaultAddress(),
+            user.getDefaultProvinceId(),
+            user.getDefaultDistrictId()
         ));
     }
 
@@ -393,6 +408,10 @@ public class AuthController {
         String oldDisplayName = user.getDisplayName();
         String oldCompanyName = user.getCompany() != null ? user.getCompany().getName() : null;
         String oldAvatarUrl = user.getAvatarUrl();
+        String oldEmail = user.getEmail();
+        String oldAddress = user.getDefaultAddress();
+        UUID oldProvinceId = user.getDefaultProvinceId();
+        UUID oldDistrictId = user.getDefaultDistrictId();
 
         // Update fields (phone number updates are not allowed for security reasons)
         if (req.userType != null) user.setUserType(req.userType);
@@ -400,6 +419,10 @@ public class AuthController {
         if (req.lastName != null) user.setLastName(req.lastName);
         if (req.displayName != null) user.setDisplayName(req.displayName);
         if (req.avatarUrl != null) user.setAvatarUrl(req.avatarUrl);
+        if (req.email != null) user.setEmail(req.email);
+        if (req.address != null) user.setDefaultAddress(req.address);
+        if (req.defaultProvinceId != null) user.setDefaultProvinceId(req.defaultProvinceId);
+        if (req.defaultDistrictId != null) user.setDefaultDistrictId(req.defaultDistrictId);
         // Note: phoneNumber updates are disabled for security - changing phone requires re-verification
 
         // Handle company
@@ -465,6 +488,10 @@ public class AuthController {
         auditUserChanges(userId, "displayName", oldDisplayName, req.displayName, AUDIT_TYPE_PROFILE_UPDATE);
         auditUserChanges(userId, "companyName", oldCompanyName, req.companyName, AUDIT_TYPE_PROFILE_UPDATE);
         auditUserChanges(userId, "avatarUrl", oldAvatarUrl, req.avatarUrl, AUDIT_TYPE_PROFILE_UPDATE);
+        auditUserChanges(userId, "email", oldEmail, req.email, AUDIT_TYPE_PROFILE_UPDATE);
+        auditUserChanges(userId, "address", oldAddress, req.address, AUDIT_TYPE_PROFILE_UPDATE);
+        auditUserChanges(userId, "defaultProvinceId", oldProvinceId != null ? oldProvinceId.toString() : null, req.defaultProvinceId != null ? req.defaultProvinceId.toString() : null, AUDIT_TYPE_PROFILE_UPDATE);
+        auditUserChanges(userId, "defaultDistrictId", oldDistrictId != null ? oldDistrictId.toString() : null, req.defaultDistrictId != null ? req.defaultDistrictId.toString() : null, AUDIT_TYPE_PROFILE_UPDATE);
         // Note: phoneNumber audit removed since phone updates are disabled
 
         return ResponseEntity.ok(Map.of("message", "Profile updated successfully"));

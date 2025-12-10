@@ -34,8 +34,8 @@ services:
       - DB_PASSWORD=postgres
       - JWT_SECRET=dev-secret-change
       - JWT_DEV_ENABLED=true
-      - TELEGRAM_BOT_TOKEN=7801597454:AAFGa8SM4bU261Qkk36nrfPqQVhWyZuwpCE
-      - TELEGRAM_BOT_USERNAME=patience_delivery_bot
+      - TELEGRAM_BOT_TOKEN=8585454641:AAHmpA7V0trkot2KZEID5FOXOFKz8THBUn0
+      - TELEGRAM_BOT_USERNAME=RoluunBot
       - TELEGRAM_POLLING_ENABLED=true
     ports:
       - "0.0.0.0:8081:8081"  # Bind to all interfaces for network access
