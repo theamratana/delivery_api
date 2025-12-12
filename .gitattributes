@@ -1,0 +1,13 @@
+# Ensure shell scripts use LF endings and don't become CRLF on Windows checkouts
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Common script file patterns
+run-api.sh text eol=lf
+reset-db.sh text eol=lf
+db-shell.sh text eol=lf
+gradlew text eol=lf
+
+# Keep Windows binaries as-is
+*.exe binary
+*.dll binary
