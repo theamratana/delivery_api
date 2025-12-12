@@ -26,3 +26,5 @@ server_*.log
 
 # Uploads
 uploads/images/
+bin/
+src/test/resources/
