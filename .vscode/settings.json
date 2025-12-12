@@ -1,14 +1,17 @@
 {
-  // Ensure VS Code Java uses JDK 17 and imports Gradle correctly
-  "java.configuration.runtimes": [
-    {
-      "name": "JavaSE-17",
-      "path": "C:/Program Files/Microsoft/jdk-17.0.17.10-hotspot",
-      "default": true
-    }
-  ],
-  // Point JDT LS directly to the JDK home (helps on some Windows setups)
-  "java.jdt.ls.java.home": "C:/Program Files/Microsoft/jdk-17.0.17.10-hotspot",
+  // Ensure VS Code Java uses a JDK compatible with the project and imports Gradle correctly
+    "java.configuration.runtimes": [
+      {
+        "name": "JavaSE-21",
+        "path": "C:/Program Files/Eclipse Adoptium/jdk-25.0.1.8-hotspot",
+        "default": true
+      }
+    ],
+  // Point JDT LS directly to the JDK home (helps on some Windows setups). We point to the
+  // installed Adoptium/Temurin JDK 25 which is compatible with Java 21 source level.
+    "java.jdt.ls.java.home": "C:/Program Files/Eclipse Adoptium/jdk-25.0.1.8-hotspot",
+    // Also ensure the `java.home` setting is set to the same JDK if other extensions use it.
+    "java.home": "C:/Program Files/Eclipse Adoptium/jdk-25.0.1.8-hotspot",
 
   // Auto-configure the project when build files change
   "java.configuration.updateBuildConfiguration": "automatic",
@@ -22,5 +25,20 @@
     "src/main/java",
     "src/test/java"
   ],
-  "java.compile.nullAnalysis.mode": "automatic"
+  "java.compile.nullAnalysis.mode": "automatic",
+  // Default integrated terminal profile for this workspace (prefer WSL/Ubuntu)
+  // Use the 'WSL' profile so VS Code will open the default WSL distribution
+  // You can change to a specific distro by setting args: ["-d", "Ubuntu"]
+  "terminal.integrated.profiles.windows": {
+    "Git Bash": {
+      "path": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "args": ["--login", "-i"]
+    },
+    "WSL": {
+      "source": "wsl"
+    }
+  },
+  // Default to Git Bash in this workspace - change back to "WSL" if you prefer WSL again
+  "terminal.integrated.defaultProfile.windows": "Git Bash",
+  "java.format.settings.url": ".vscode/java-formatter.xml"
 }
