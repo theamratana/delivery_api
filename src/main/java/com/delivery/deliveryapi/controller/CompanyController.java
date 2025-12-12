@@ -114,6 +114,45 @@ public class CompanyController {
         return ResponseEntity.ok(new CompanyBrowseResponse(company, districtRepository, provinceRepository, companyCategoryRepository));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<Object> getCompanyById(@PathVariable UUID id) {
+        try {
+            User currentUser = getCurrentUser();
+            if (currentUser.getCompany() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "User is not part of any company"));
+            }
+
+            // Find the requested company
+            Optional<Company> optCompany = companyRepository.findById(id);
+            if (optCompany.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Company company = optCompany.get();
+
+            // Check if user can view this company:
+            // 1. It's their own company, OR
+            // 2. It was created by their company
+            boolean isOwnCompany = company.getId().equals(currentUser.getCompany().getId());
+            boolean isCreatedByMyCompany = company.getCreatedByCompany() != null && 
+                company.getCreatedByCompany().getId().equals(currentUser.getCompany().getId());
+            
+            if (!isOwnCompany && !isCreatedByMyCompany) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "You can only view your own company or companies created by your company"));
+            }
+
+            return ResponseEntity.ok(new CompanyBrowseResponse(company, districtRepository, provinceRepository, companyCategoryRepository));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PutMapping("/my")
     @Transactional
     public ResponseEntity<Object> updateMyCompany(@RequestBody @Valid UpdateCompanyRequest req) {
@@ -226,6 +265,7 @@ public class CompanyController {
 
             company.setDistrictId(req.districtId());
             company.setProvinceId(req.provinceId());
+            company.setCategoryId(req.categoryId());
             company.setUpdatedByUser(currentUser);
             companyRepository.save(company);
 
@@ -282,7 +322,8 @@ public class CompanyController {
         String phoneNumber,
         String address,
         UUID districtId,
-        UUID provinceId
+        UUID provinceId,
+        UUID categoryId
     ) {}
 
     public record CompanyBrowseResponse(
@@ -290,10 +331,9 @@ public class CompanyController {
         String name,
         String phoneNumber,
         String address,
-        String categoryCode,
-        String categoryName,
-        String provinceName,
-        String districtName
+        UUID categoryId,
+        UUID provinceId,
+        UUID districtId
     ) {
         public CompanyBrowseResponse(Company company, DistrictRepository districtRepository, 
                                     ProvinceRepository provinceRepository, CompanyCategoryRepository categorRepository) {
@@ -302,14 +342,9 @@ public class CompanyController {
                 company.getName(),
                 company.getPhoneNumber(),
                 company.getAddress(),
-                company.getCategoryId() != null ? 
-                    categorRepository.findById(company.getCategoryId()).map(CompanyCategory::getCode).orElse(null) : null,
-                company.getCategoryId() != null ? 
-                    categorRepository.findById(company.getCategoryId()).map(CompanyCategory::getName).orElse(null) : null,
-                company.getProvinceId() != null ? 
-                    provinceRepository.findById(company.getProvinceId()).map(Province::getName).orElse(null) : null,
-                company.getDistrictId() != null ? 
-                    districtRepository.findById(company.getDistrictId()).map(District::getName).orElse(null) : null
+                company.getCategoryId(),
+                company.getProvinceId(),
+                company.getDistrictId()
             );
         }
     }
