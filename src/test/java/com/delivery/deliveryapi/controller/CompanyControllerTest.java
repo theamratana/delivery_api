@@ -11,16 +11,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.mockito.ArgumentMatchers.any;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import org.mockito.MockitoAnnotations;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.web.servlet.MockMvc;
 
 import com.delivery.deliveryapi.model.Company;
 import com.delivery.deliveryapi.model.District;
@@ -31,25 +32,29 @@ import com.delivery.deliveryapi.repo.CompanyRepository;
 import com.delivery.deliveryapi.repo.DistrictRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
 
+@WebMvcTest(CompanyController.class)
 class CompanyControllerTest {
 
-    @Mock
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private CompanyController companyController;
+
+    @MockBean
     private CompanyRepository companyRepository;
 
-    @Mock
+    @MockBean
     private UserRepository userRepository;
 
-    @Mock
+    @MockBean
     private DistrictRepository districtRepository;
 
-    @Mock
+    @MockBean
     private SecurityContext securityContext;
 
-    @Mock
+    @MockBean
     private Authentication authentication;
-
-    @InjectMocks
-    private CompanyController companyController;
 
     private User testUser;
     private Company testCompany;
@@ -58,8 +63,6 @@ class CompanyControllerTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        MockitoAnnotations.openMocks(this);
-
         userId = UUID.randomUUID();
         companyId = UUID.randomUUID();
 
@@ -85,7 +88,7 @@ class CompanyControllerTest {
         companyIdField.set(testCompany, companyId);
         testCompany.setName("Test Company");
         testCompany.setAddress("123 Test St");
-        testCompany.setDistrict(testDistrict);
+        testCompany.setDistrictId(testDistrict.getId());
         testCompany.setActive(true);
 
         testUser = new User();
@@ -156,14 +159,20 @@ class CompanyControllerTest {
     void testUpdateMyCompany_Success() {
         // Arrange
         UUID districtId = UUID.randomUUID();
+        UUID provinceId = UUID.randomUUID();
+        UUID categoryId = UUID.randomUUID();
+        String phoneNumber = "0123456789";
         when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
         when(companyRepository.save(any(Company.class))).thenReturn(testCompany);
-        when(districtRepository.findById(districtId)).thenReturn(Optional.of(testCompany.getDistrict()));
+        when(districtRepository.findById(districtId)).thenReturn(Optional.of(new District()));
 
         CompanyController.UpdateCompanyRequest request = new CompanyController.UpdateCompanyRequest(
             "Updated Company",
             "456 New St",
-            districtId
+            phoneNumber,
+            districtId,
+            provinceId,
+            categoryId
         );
 
         // Act
@@ -187,6 +196,9 @@ class CompanyControllerTest {
         CompanyController.UpdateCompanyRequest request = new CompanyController.UpdateCompanyRequest(
             "Updated Company",
             "456 New St",
+            "0123456789",
+            UUID.randomUUID(),
+            UUID.randomUUID(),
             UUID.randomUUID()
         );
 
@@ -210,6 +222,9 @@ class CompanyControllerTest {
         CompanyController.UpdateCompanyRequest request = new CompanyController.UpdateCompanyRequest(
             "Updated Company",
             "456 New St",
+            "0123456789",
+            UUID.randomUUID(),
+            UUID.randomUUID(),
             UUID.randomUUID()
         );
 
