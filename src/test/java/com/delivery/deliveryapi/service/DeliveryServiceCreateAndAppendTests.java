@@ -8,16 +8,15 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 import com.delivery.deliveryapi.controller.DeliveryController.CreateDeliveryRequest;
 import com.delivery.deliveryapi.controller.DeliveryController.DeliveryItemPayload;
@@ -34,35 +33,35 @@ import com.delivery.deliveryapi.repo.DeliveryPhotoRepository;
 import com.delivery.deliveryapi.repo.ProductRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
 
-@ExtendWith(MockitoExtension.class)
+@SpringBootTest
 class DeliveryServiceCreateAndAppendTests {
 
-    @Mock
+    @Autowired
+    DeliveryService deliveryService;
+
+    @MockBean
     DeliveryItemRepository deliveryItemRepository;
 
-    @Mock
+    @MockBean
     UserRepository userRepository;
 
-    @Mock
+    @MockBean
     CompanyRepository companyRepository;
 
-    @Mock
+    @MockBean
     DeliveryPhotoRepository deliveryPhotoRepository;
 
-    @Mock
+    @MockBean
     DeliveryPricingService deliveryPricingService;
 
-    @Mock
+    @MockBean
     ProductService productService;
 
-    @Mock
+    @MockBean
     ProductRepository productRepository;
 
-    @Mock
+    @MockBean
     com.delivery.deliveryapi.repo.DeliveryPackageRepository deliveryPackageRepository;
-
-    @InjectMocks
-    DeliveryService deliveryService;
 
     private User buildSender() {
         User sender = new User();

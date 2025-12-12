@@ -13,8 +13,9 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 import com.delivery.deliveryapi.controller.DeliveryController.DeliveryItemPayload;
 import com.delivery.deliveryapi.model.DeliveryItem;
@@ -25,43 +26,41 @@ import com.delivery.deliveryapi.model.User;
 
 import java.util.ArrayList;
 
+@SpringBootTest
 public class DeliveryServicePackageTests {
 
-    @Mock
+    @Autowired
+    private DeliveryService deliveryService;
+
+    @MockBean
     private com.delivery.deliveryapi.repo.DeliveryItemRepository deliveryItemRepository;
 
-    @Mock
+    @MockBean
     private com.delivery.deliveryapi.repo.UserRepository userRepository;
 
-    @Mock
+    @MockBean
     private com.delivery.deliveryapi.repo.CompanyRepository companyRepository;
 
-    @Mock
+    @MockBean
     private com.delivery.deliveryapi.repo.DeliveryPhotoRepository deliveryPhotoRepository;
 
-    @Mock
+    @MockBean
     private DeliveryPricingService deliveryPricingService;
 
-    @Mock
+    @MockBean
     private ProductService productService;
 
-    @Mock
+    @MockBean
     private com.delivery.deliveryapi.repo.ProductRepository productRepository;
 
-    @Mock
+    @MockBean
     private com.delivery.deliveryapi.repo.DeliveryPackageRepository deliveryPackageRepository;
-
-    private DeliveryService deliveryService;
 
     private User sender;
 
     @BeforeEach
     public void setup() {
-        MockitoAnnotations.openMocks(this);
-        deliveryService = new DeliveryService(deliveryItemRepository, userRepository, companyRepository,
-                deliveryPhotoRepository, deliveryPricingService, productService, productRepository,
-                deliveryPackageRepository);
-
+        // Spring will autowire deliveryService
         sender = new User();
         try {
             java.lang.reflect.Field idField = User.class.getDeclaredField("id");

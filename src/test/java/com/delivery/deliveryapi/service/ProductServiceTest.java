@@ -24,24 +24,27 @@ import com.delivery.deliveryapi.repo.ImageRepository;
 import com.delivery.deliveryapi.repo.ProductImageRepository;
 import com.delivery.deliveryapi.repo.ProductRepository;
 import com.delivery.deliveryapi.repo.ProductCategoryRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
-@ExtendWith(MockitoExtension.class)
+@SpringBootTest
 class ProductServiceTest {
 
-    @Mock
+    @Autowired
+    private ProductService productService;
+
+    @MockBean
     private ProductRepository productRepository;
 
-    @Mock
+    @MockBean
     private ProductCategoryRepository productCategoryRepository;
 
-    @Mock
+    @MockBean
     private ImageRepository imageRepository;
 
-    @Mock
+    @MockBean
     private ProductImageRepository productImageRepository;
-
-    @InjectMocks
-    private ProductService productService;
 
     private Company company;
     private User user;

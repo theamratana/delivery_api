@@ -129,7 +129,7 @@ class DeliveryPricingServiceTest {
         when(pricingRuleRepository.save(any(DeliveryPricingRule.class))).thenReturn(updatedRule);
 
         // When
-        DeliveryPricingRule result = pricingService.updatePricingRule(ruleId, newRuleName, newBaseFee, null, null);
+        DeliveryPricingRule result = pricingService.updatePricingRule(ruleId, newRuleName, null, null, newBaseFee, null, null, null);
 
         // Then
         assertNotNull(result);
@@ -147,7 +147,7 @@ class DeliveryPricingServiceTest {
 
         // When & Then
         assertThrows(IllegalArgumentException.class, () ->
-            pricingService.updatePricingRule(ruleId, "Test", BigDecimal.ONE, null, null));
+            pricingService.updatePricingRule(ruleId, "Test", null, null, BigDecimal.ONE, null, null, null));
     }
 
     @Test

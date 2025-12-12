@@ -12,44 +12,52 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import static org.mockito.Mockito.when;
-import org.mockito.MockitoAnnotations;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.web.servlet.MockMvc;
 
 import com.delivery.deliveryapi.model.DeliveryStatus;
 import com.delivery.deliveryapi.model.User;
 import com.delivery.deliveryapi.model.UserRole;
 import com.delivery.deliveryapi.repo.DeliveryItemRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
+import com.delivery.deliveryapi.service.DeliveryService;
 
+@WebMvcTest(DeliveryController.class)
 class DeliveryControllerSummaryTest {
 
-    @Mock
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private DeliveryController deliveryController;
+
+    @MockBean
     private DeliveryItemRepository deliveryItemRepository;
 
-    @Mock
+    @MockBean
     private UserRepository userRepository;
 
-    @Mock
+    @MockBean
+    private DeliveryService deliveryService;
+
+    @MockBean
     private SecurityContext securityContext;
 
-    @Mock
+    @MockBean
     private Authentication authentication;
-
-    @InjectMocks
-    private DeliveryController deliveryController;
 
     private UUID userId;
     private User testUser;
 
     @BeforeEach
     void setup() throws Exception {
-        MockitoAnnotations.openMocks(this);
 
         userId = UUID.randomUUID();
 

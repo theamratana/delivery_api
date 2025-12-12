@@ -7,13 +7,14 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.web.servlet.MockMvc;
 
 import com.delivery.deliveryapi.model.Company;
 import com.delivery.deliveryapi.model.Product;
@@ -22,23 +23,26 @@ import com.delivery.deliveryapi.service.ProductService;
 import com.delivery.deliveryapi.repo.UserRepository;
 import com.delivery.deliveryapi.model.UserRole;
 
+@WebMvcTest(ProductController.class)
 class ProductControllerTest {
 
-    @Mock
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ProductController productController;
+
+    @MockBean
     private ProductService productService;
 
-    @Mock
+    @MockBean
     private UserRepository userRepository;
-
-    @InjectMocks
-    private ProductController productController;
 
     private User user;
     private Company company;
 
     @BeforeEach
     void setup() {
-        MockitoAnnotations.openMocks(this);
         company = new Company();
         user = new User();
         user.setCompany(company);

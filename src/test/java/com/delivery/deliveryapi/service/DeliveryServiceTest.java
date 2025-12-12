@@ -13,12 +13,12 @@ import org.junit.jupiter.api.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import org.mockito.MockitoAnnotations;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 import com.delivery.deliveryapi.controller.DeliveryController.CreateDeliveryRequest;
 import com.delivery.deliveryapi.controller.DeliveryController.DeliveryItemPayload;
@@ -33,38 +33,38 @@ import com.delivery.deliveryapi.repo.DeliveryPhotoRepository;
 import com.delivery.deliveryapi.repo.ProductRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
 
+@SpringBootTest
 class DeliveryServiceTest {
 
-    @Mock
+    @Autowired
+    private DeliveryService deliveryService;
+
+    @MockBean
     private DeliveryItemRepository deliveryItemRepository;
 
-    @Mock
+    @MockBean
     private UserRepository userRepository;
 
-    @Mock
+    @MockBean
     private CompanyRepository companyRepository;
 
-    @Mock
+    @MockBean
     private ProductRepository productRepository;
 
-    @Mock
+    @MockBean
     private DeliveryPhotoRepository deliveryPhotoRepository;
 
-    @Mock
+    @MockBean
     private com.delivery.deliveryapi.repo.DeliveryPackageRepository deliveryPackageRepository;
 
-    @Mock
+    @MockBean
     private DeliveryPricingService deliveryPricingService;
 
-    @Mock
+    @MockBean
     private ProductService productService;
-
-    @InjectMocks
-    private DeliveryService deliveryService;
 
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
         // Common stubs used by delivery creation tests
         when(deliveryPackageRepository.save(any(com.delivery.deliveryapi.model.DeliveryPackage.class))).thenAnswer(inv -> {
             com.delivery.deliveryapi.model.DeliveryPackage p = inv.getArgument(0);
@@ -97,7 +97,7 @@ class DeliveryServiceTest {
         companyIdField.setAccessible(true);
         companyIdField.set(company, UUID.randomUUID());
         company.setAddress("123 Main St");
-        company.setDistrict(district);
+        company.setDistrictId(district.getId());
 
         User sender = new User();
         Field senderIdField = User.class.getDeclaredField("id");
@@ -170,7 +170,7 @@ class DeliveryServiceTest {
         companyIdField.setAccessible(true);
         companyIdField.set(company, UUID.randomUUID());
         company.setAddress("123 Main St");
-        company.setDistrict(district);
+        company.setDistrictId(district.getId());
 
         User sender = new User();
         Field senderIdField = User.class.getDeclaredField("id");
