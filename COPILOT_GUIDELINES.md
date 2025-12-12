@@ -27,13 +27,30 @@
 - For clean rebuild: `docker compose down && docker compose up -d --build`
 - Check if containers are running: `docker ps`
 
-### 5. Testing After Changes
-- Test endpoints with curl after deployment
-- Use token from `new_token.json` file
-- Format: `TOKEN=$(cat new_token.json | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')`
-- Always verify response matches expected format
+### 5. Authentication Token Management
+- **Use these credentials to generate tokens:**
+  ```json
+  {
+    "username": "u_+85589504405",
+    "password": "blingAdmin@2025"
+  }
+  ```
+- **Login endpoint:** `POST http://localhost:8081/api/auth/login`
+- **Store token in `new_token.json` file after login**
+- **Reuse token from `new_token.json` for subsequent requests**
+- **Only re-login when token is invalid** (401 Unauthorized or JWT errors)
+- **Token extraction format:**
+  ```bash
+  TOKEN=$(cat new_token.json | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
+  ```
 
-### 6. Terminal Commands
+### 6. Testing After Changes
+- Test endpoints with curl after deployment
+- Extract and use token from `new_token.json`
+- Always verify response matches expected format
+- Check for 401/403 errors - may need to refresh token
+
+### 7. Terminal Commands
 - **CRITICAL**: Always type full commands correctly - no missing first character!
 - Use bash/Git Bash terminal (Windows environment)
 - Use `&&` to chain commands
@@ -75,6 +92,7 @@
 
 ```bash
 # 1. Make code changes
+
 # 2. Build and test
 ./gradlew build -x test
 
@@ -84,11 +102,22 @@ docker compose build --no-cache api && docker compose up -d
 # 4. Wait for startup (5-10 seconds)
 sleep 8
 
-# 5. Test the endpoints
-TOKEN=$(cat new_token.json | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
+# 5. Get authentication token (only if needed)
+# Check if token exists and is valid first
+TOKEN=$(cat new_token.json 2>/dev/null | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
+if [ -z "$TOKEN" ]; then
+  # Login to get new token
+  curl -s -X POST http://localhost:8081/api/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"username":"u_+85589504405","password":"blingAdmin@2025"}' \
+    > new_token.json
+  TOKEN=$(cat new_token.json | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
+fi
+
+# 6. Test the endpoints
 curl -s "http://localhost:8081/api/your-endpoint" -H "Authorization: Bearer $TOKEN"
 
-# 6. If tests pass, commit
+# 7. If tests pass, commit
 git add <files>
 git commit -m "feat: clear description of what changed"
 ```
