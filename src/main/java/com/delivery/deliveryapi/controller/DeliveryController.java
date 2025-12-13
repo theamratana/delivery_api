@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.delivery.deliveryapi.dto.DeliveryBatchDTO;
 import com.delivery.deliveryapi.dto.ReceiverSuggestion;
+import com.delivery.deliveryapi.dto.StatusDisplayDTO;
 import com.delivery.deliveryapi.model.Company;
 import com.delivery.deliveryapi.model.DeliveryItem;
 import com.delivery.deliveryapi.model.DeliveryPhoto;
@@ -167,9 +168,13 @@ public class DeliveryController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Get the responsible party for a delivery status (for UI grouping by responsibility)
+     * This is different from StatusGroup which groups by delivery lifecycle stage
+     */
     private static String statusGroupFor(DeliveryStatus status) {
         return switch (status) {
-            case CREATED, CANCELLED, FAILED -> "Sender";
+            case CREATED, DROPPED_OFF, CANCELLED, FAILED, FAILED_DELIVERY -> "Sender";
             case ASSIGNED, PICKED_UP, IN_TRANSIT, OUT_FOR_DELIVERY, RETURNED -> "DeliveryCompany";
             case DELIVERED -> "Receiver";
             default -> "Sender";
@@ -364,6 +369,7 @@ public class DeliveryController {
         }
         
         batch.setStatus(first.getStatus().toString());
+        batch.setStatusDisplay(StatusDisplayDTO.fromDeliveryStatus(first.getStatus()));
         batch.setPaymentMethod(first.getPaymentMethod().toString().toLowerCase());
         batch.setEstimatedDeliveryTime(first.getEstimatedDeliveryTime());
         batch.setCreatedAt(first.getCreatedAt());
@@ -485,7 +491,8 @@ public class DeliveryController {
         }
         
         batch.setStatus(first.getStatus().toString());
-                batch.setPaymentMethod(first.getPaymentMethod().toString().toLowerCase());
+        batch.setStatusDisplay(StatusDisplayDTO.fromDeliveryStatus(first.getStatus()));
+        batch.setPaymentMethod(first.getPaymentMethod().toString().toLowerCase());
         batch.setEstimatedDeliveryTime(first.getEstimatedDeliveryTime());
         batch.setCreatedAt(first.getCreatedAt());
         batch.setUpdatedAt(first.getUpdatedAt());
@@ -654,6 +661,7 @@ public class DeliveryController {
                 batch.setExchangeRateUsed(item.getExchangeRateUsed());
                 
                 batch.setStatus(item.getStatus().toString());
+                batch.setStatusDisplay(StatusDisplayDTO.fromDeliveryStatus(item.getStatus()));
                 batch.setPaymentMethod(item.getPaymentMethod() != null ? item.getPaymentMethod().getCode() : "COD");
                 batch.setEstimatedDeliveryTime(item.getEstimatedDeliveryTime());
                 batch.setCreatedAt(item.getCreatedAt());
@@ -800,6 +808,7 @@ public class DeliveryController {
             batch.setDeliveryDriverId(first.getDeliveryDriver() != null ? first.getDeliveryDriver().getId() : null);
             batch.setDeliveryDriverName(first.getDeliveryDriver() != null ? first.getDeliveryDriver().getFullName() : null);
             batch.setStatus(first.getStatus().name());
+            batch.setStatusDisplay(StatusDisplayDTO.fromDeliveryStatus(first.getStatus()));
             batch.setPaymentMethod(first.getPaymentMethod().name().toLowerCase());
             batch.setEstimatedDeliveryTime(first.getEstimatedDeliveryTime());
             batch.setCreatedAt(first.getCreatedAt());
@@ -922,6 +931,7 @@ public class DeliveryController {
             batch.setDeliveryFee(first.getDeliveryFee());
             
             batch.setStatus(first.getStatus().toString());
+            batch.setStatusDisplay(StatusDisplayDTO.fromDeliveryStatus(first.getStatus()));
             batch.setPaymentMethod(first.getPaymentMethod() != null ? first.getPaymentMethod().getCode() : "COD");
             batch.setEstimatedDeliveryTime(first.getEstimatedDeliveryTime());
             batch.setCreatedAt(first.getCreatedAt());
@@ -1039,7 +1049,11 @@ public class DeliveryController {
         DeliveryTracking tracking = new DeliveryTracking(item, newStatus, req.getNote() != null ? req.getNote() : "Status updated via API", currentUser);
         deliveryTrackingRepository.save(tracking);
 
-        return ResponseEntity.ok(Map.of("status", newStatus.toString(), "deliveryId", item.getId()));
+        return ResponseEntity.ok(Map.of(
+            "status", newStatus.toString(), 
+            "statusDisplay", StatusDisplayDTO.fromDeliveryStatus(newStatus),
+            "deliveryId", item.getId()
+        ));
     }
 
     @GetMapping("/{id}/tracking")
@@ -1083,6 +1097,23 @@ public class DeliveryController {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", t.getId());
             m.put("status", t.getStatus() != null ? t.getStatus().toString() : null);
+            
+            // Add status display information with translations and grouping
+            if (t.getStatus() != null) {
+                Map<String, Object> statusDisplay = new LinkedHashMap<>();
+                statusDisplay.put("code", t.getStatus().toString());
+                statusDisplay.put("english", t.getStatus().getEnglishName());
+                statusDisplay.put("khmer", t.getStatus().getKhmerName());
+                
+                Map<String, Object> groupInfo = new LinkedHashMap<>();
+                groupInfo.put("code", t.getStatus().getGroup().name());
+                groupInfo.put("english", t.getStatus().getGroup().getEnglishName());
+                groupInfo.put("khmer", t.getStatus().getGroup().getKhmerName());
+                statusDisplay.put("group", groupInfo);
+                
+                m.put("statusDisplay", statusDisplay);
+            }
+            
             m.put("description", t.getDescription());
             m.put("timestamp", t.getTimestamp());
             m.put("statusUpdatedById", t.getStatusUpdatedBy() != null ? t.getStatusUpdatedBy().getId() : null);
@@ -1446,6 +1477,9 @@ public class DeliveryController {
         @JsonProperty("status")
         private String status;
 
+        @JsonProperty("statusDisplay")
+        private StatusDisplayDTO statusDisplay;
+
         @JsonProperty("trackingCode")
         private String trackingCode;
 
@@ -1458,6 +1492,7 @@ public class DeliveryController {
         public DeliveryResponse(DeliveryItem delivery) {
             this.deliveryId = delivery.getId();
             this.status = delivery.getStatus().toString();
+            this.statusDisplay = StatusDisplayDTO.fromDeliveryStatus(delivery.getStatus());
             this.trackingCode = "DEL" + delivery.getId().toString().substring(0, 8).toUpperCase();
             this.estimatedDelivery = delivery.getEstimatedDeliveryTime() != null ?
                     delivery.getEstimatedDeliveryTime().toString() : null;

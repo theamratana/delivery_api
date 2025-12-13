@@ -19,6 +19,9 @@ public class DeliveryItemDTO {
     @JsonProperty("status")
     private DeliveryStatus status;
 
+    @JsonProperty("statusDisplay")
+    private StatusDisplayDTO statusDisplay;
+
     @JsonProperty("paymentMethod")
     private String paymentMethod;
 
@@ -179,7 +182,15 @@ public class DeliveryItemDTO {
     public void setItemDescription(String itemDescription) { this.itemDescription = itemDescription; }
 
     public DeliveryStatus getStatus() { return status; }
-    public void setStatus(DeliveryStatus status) { this.status = status; }
+    public void setStatus(DeliveryStatus status) { 
+        this.status = status;
+        if (status != null) {
+            this.statusDisplay = StatusDisplayDTO.fromDeliveryStatus(status);
+        }
+    }
+
+    public StatusDisplayDTO getStatusDisplay() { return statusDisplay; }
+    public void setStatusDisplay(StatusDisplayDTO statusDisplay) { this.statusDisplay = statusDisplay; }
 
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }

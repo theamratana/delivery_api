@@ -83,6 +83,9 @@ public class DeliveryBatchDTO {
     @JsonProperty("status")
     private String status;
 
+    @JsonProperty("statusDisplay")
+    private StatusDisplayDTO statusDisplay;
+
     @JsonProperty("paymentMethod")
     private String paymentMethod;
 
@@ -173,6 +176,9 @@ public class DeliveryBatchDTO {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public StatusDisplayDTO getStatusDisplay() { return statusDisplay; }
+    public void setStatusDisplay(StatusDisplayDTO statusDisplay) { this.statusDisplay = statusDisplay; }
 
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
