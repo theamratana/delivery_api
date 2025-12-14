@@ -450,6 +450,7 @@ public class AuthController {
                     long userCount = userRepository.countByCompanyId(company.getId());
                     if (userCount == 0) {
                         user.setUserRole(UserRole.OWNER);
+                        user.setUserType(UserType.COMPANY);
                     }
                     user.setCompany(company);
                 } else {
@@ -457,9 +458,22 @@ public class AuthController {
                     Company company = new Company(companyNameTrimmed);
                     company.setCreatedByUser(user);
                     // Don't set createdByCompany for user's own company (self-created)
+                    
+                    // Populate company address from user's profile
+                    if (user.getDefaultAddress() != null) {
+                        company.setAddress(user.getDefaultAddress());
+                    }
+                    if (user.getDefaultProvinceId() != null) {
+                        company.setProvinceId(user.getDefaultProvinceId());
+                    }
+                    if (user.getDefaultDistrictId() != null) {
+                        company.setDistrictId(user.getDefaultDistrictId());
+                    }
+                    
                     company = companyRepository.save(company);
                     user.setCompany(company);
                     user.setUserRole(UserRole.OWNER);
+                    user.setUserType(UserType.COMPANY);
 
                     // Create employee record for the owner (only if one doesn't exist)
                     Optional<Employee> existingEmployee = employeeRepository.findByUserIdAndCompanyId(userId, company.getId());
