@@ -8,6 +8,31 @@ export DB_USERNAME=${DB_USERNAME:-postgres}
 export DB_PASSWORD=${DB_PASSWORD:-postgres}
 export SERVER_PORT=${SERVER_PORT:-8081}
 
+show_help() {
+	cat <<EOF
+Usage: ./run-api.sh [command]
+
+Commands:
+  start         Start API (uses existing Docker image if available)
+  stop          Stop API and containers
+  restart       Stop then start API
+  status        Check if API is running
+  rebuild       Quick rebuild with latest code (uses cache, faster) 🔄
+  start-clean   Full clean rebuild (no cache, guaranteed fresh) 🧹
+  clean         Alias for start-clean
+  help          Show this help message
+
+Examples:
+  ./run-api.sh start          # Normal start
+  ./run-api.sh rebuild        # After code changes (recommended)
+  ./run-api.sh start-clean    # When rebuild doesn't work
+  ./run-api.sh stop           # Stop everything
+
+Access API at: http://localhost:${SERVER_PORT}/api/
+EOF
+	exit 0
+}
+
 # Utilities
 port_in_use() {
 	local p="$1"
@@ -85,6 +110,9 @@ docker_api_running() {
 }
 
 case "$cmd" in
+	help|--help|-h)
+		show_help
+		;;
 	stop)
 		# Try to stop Docker containers first
 		if docker_available; then
@@ -128,6 +156,60 @@ case "$cmd" in
 		fi
 		sleep 1
 		"$0" start
+		;;
+	rebuild)
+		# Quick rebuild (uses Gradle cache, faster)
+		if docker_available; then
+			echo "🔄 Rebuilding with latest code..."
+			echo "   Step 1: Stopping API container..."
+			docker compose stop api
+			echo "   Step 2: Building Gradle (incremental)..."
+			./gradlew build -x test
+			echo "   Step 3: Rebuilding Docker image..."
+			docker compose build api
+			echo "   Step 4: Starting containers..."
+			docker compose up -d postgres api
+			echo "✅ Docker containers started with latest code"
+			echo "   Waiting for API to be ready..."
+			sleep 10
+			if curl -s http://localhost:${SERVER_PORT}/api/auth/dev/token/00000000-0000-0000-0000-000000000000 >/dev/null 2>&1; then
+				echo "✅ API is ready!"
+				echo "   Access at: http://localhost:${SERVER_PORT}/api/"
+			else
+				echo "⚠️  API started but may still be initializing. Check logs: docker compose logs api"
+			fi
+			exit 0
+		else
+			echo "❌ Docker not available. Use './run-api.sh restart' for local mode."
+			exit 1
+		fi
+		;;
+	start-clean|clean)
+		# Force full clean rebuild (no cache, slower but guaranteed fresh)
+		if docker_available; then
+			echo "🧹 Cleaning and rebuilding Docker image with latest code..."
+			echo "   Step 1: Stopping containers..."
+			docker compose down
+			echo "   Step 2: Building Gradle (clean)..."
+			./gradlew clean build -x test
+			echo "   Step 3: Rebuilding Docker image (no cache)..."
+			docker compose build --no-cache api
+			echo "   Step 4: Starting containers..."
+			docker compose up -d postgres api
+			echo "✅ Docker containers started with fresh build"
+			echo "   Waiting for API to be ready..."
+			sleep 10
+			if curl -s http://localhost:${SERVER_PORT}/api/auth/dev/token/00000000-0000-0000-0000-000000000000 >/dev/null 2>&1; then
+				echo "✅ API is ready!"
+				echo "   Access at: http://localhost:${SERVER_PORT}/api/"
+			else
+				echo "⚠️  API started but may still be initializing. Check logs: docker compose logs api"
+			fi
+			exit 0
+		else
+			echo "❌ Docker not available. Use './run-api.sh restart' for local mode."
+			exit 1
+		fi
 		;;
 	start|*)
 		# Check if Docker is available and start via Docker
