@@ -24,17 +24,11 @@ public class ProductDTO {
     @JsonProperty("categoryName")
     private String categoryName;
     
-    @JsonProperty("defaultPrice")
-    private BigDecimal defaultPrice;
-    
     @JsonProperty("buyingPrice")
     private BigDecimal buyingPrice;
     
     @JsonProperty("sellingPrice")
     private BigDecimal sellingPrice;
-
-    @JsonProperty("lastSellPrice")
-    private BigDecimal lastSellPrice;
     
     @JsonProperty("isPublished")
     private Boolean isPublished;
@@ -44,6 +38,9 @@ public class ProductDTO {
     
     @JsonProperty("dimensions")
     private String dimensions;
+    
+    @JsonProperty("attributes")
+    private String attributes;
     
     @JsonProperty("productPhotos")
     private java.util.List<ImageDTO> productPhotos;
@@ -64,12 +61,6 @@ public class ProductDTO {
     @JsonProperty("isActive")
     private Boolean isActive;
     
-    @JsonProperty("usageCount")
-    private Integer usageCount;
-    
-    @JsonProperty("lastUsedAt")
-    private OffsetDateTime lastUsedAt;
-    
     @JsonProperty("companyId")
     private UUID companyId;
     
@@ -83,16 +74,13 @@ public class ProductDTO {
         dto.setId(product.getId());
         dto.setName(product.getName());
         dto.setDescription(product.getDescription());
-        dto.setDefaultPrice(product.getDefaultPrice());
         dto.setBuyingPrice(product.getBuyingPrice());
         dto.setSellingPrice(product.getSellingPrice());
-        dto.setLastSellPrice(product.getLastSellPrice());
         dto.setIsPublished(product.getIsPublished());
         dto.setWeightKg(product.getWeightKg());
         dto.setDimensions(product.getDimensions());
+        dto.setAttributes(product.getAttributes());
         dto.setIsActive(product.getIsActive());
-        dto.setUsageCount(product.getUsageCount());
-        dto.setLastUsedAt(product.getLastUsedAt());
         
         if (product.getCompany() != null) {
             dto.setCompanyId(product.getCompany().getId());
@@ -129,17 +117,11 @@ public class ProductDTO {
     public String getCategoryName() { return categoryName; }
     public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
 
-    public BigDecimal getDefaultPrice() { return defaultPrice; }
-    public void setDefaultPrice(BigDecimal defaultPrice) { this.defaultPrice = defaultPrice; }
-
     public BigDecimal getBuyingPrice() { return buyingPrice; }
     public void setBuyingPrice(BigDecimal buyingPrice) { this.buyingPrice = buyingPrice; }
 
     public BigDecimal getSellingPrice() { return sellingPrice; }
     public void setSellingPrice(BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
-
-    public BigDecimal getLastSellPrice() { return lastSellPrice; }
-    public void setLastSellPrice(BigDecimal lastSellPrice) { this.lastSellPrice = lastSellPrice; }
 
     public Boolean getIsPublished() { return isPublished; }
     public void setIsPublished(Boolean isPublished) { this.isPublished = isPublished; }
@@ -150,14 +132,11 @@ public class ProductDTO {
     public String getDimensions() { return dimensions; }
     public void setDimensions(String dimensions) { this.dimensions = dimensions; }
 
+    public String getAttributes() { return attributes; }
+    public void setAttributes(String attributes) { this.attributes = attributes; }
+
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
-
-    public Integer getUsageCount() { return usageCount; }
-    public void setUsageCount(Integer usageCount) { this.usageCount = usageCount; }
-
-    public OffsetDateTime getLastUsedAt() { return lastUsedAt; }
-    public void setLastUsedAt(OffsetDateTime lastUsedAt) { this.lastUsedAt = lastUsedAt; }
 
     public UUID getCompanyId() { return companyId; }
     public void setCompanyId(UUID companyId) { this.companyId = companyId; }

@@ -57,7 +57,7 @@ public class ProductImageIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Test
-    void uploadImageAndCreateProductWithLastSellPrice() throws Exception {
+    void uploadImageAndCreateProductWithPhotos() throws Exception {
         // Prepare company and user
         Company company = new Company();
         company.setName("TestCo");
@@ -86,8 +86,8 @@ public class ProductImageIntegrationTest {
         ImageUploadResult uploaded = results.get(0);
         assertThat(uploaded.getId()).isNotEmpty();
 
-        // Create product using a direct POST to /products endpoint, passing lastSellPrice and productPhotos
-        String payload = "{\"name\": \"IntegrationProduct\", \"productPhotos\": [\"" + uploaded.getId() + "\"], \"defaultPrice\": 20.00, \"lastSellPrice\": 15.00 }";
+        // Create product using a direct POST to /products endpoint, passing productPhotos
+        String payload = "{\"name\": \"IntegrationProduct\", \"productPhotos\": [\"" + uploaded.getId() + "\"], \"buyingPrice\": 20.00, \"sellingPrice\": 25.00 }";
 
         MvcResult cres = mockMvc.perform(post("/api/products").contentType(MediaType.APPLICATION_JSON)
             .content(payload).with(authentication(auth)))
@@ -95,10 +95,8 @@ public class ProductImageIntegrationTest {
             .andReturn();
 
         String prodJson = cres.getResponse().getContentAsString();
-        // Parse same structure (partial) and assert lastSellPrice & productPhotos present
+        // Parse and assert productPhotos present
         com.fasterxml.jackson.databind.JsonNode node = objectMapper.readTree(prodJson);
-        assertThat(node.get("lastSellPrice")).isNotNull();
-        assertThat(node.get("lastSellPrice").decimalValue().doubleValue()).isEqualTo(15.0);
         assertThat(node.get("productPhotos")).isNotNull();
         assertThat(node.get("productPhotos").get(0).get("id").asText()).isEqualTo(uploaded.getId());
     }

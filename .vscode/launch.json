@@ -1,0 +1,32 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Debug Delivery API",
+            "request": "launch",
+            "mainClass": "com.delivery.deliveryapi.DeliveryApiApplication",
+            "args": "",
+            "console": "integratedTerminal",
+            "env": {
+                "DB_URL": "jdbc:postgresql://localhost:5433/deliverydb",
+                "DB_USERNAME": "postgres",
+                "DB_PASSWORD": "postgres",
+                "SERVER_PORT": "8081"
+            }
+        },
+        {
+            "type": "java",
+            "name": "Debug Current File",
+            "request": "launch",
+            "mainClass": "${file}"
+        },
+        {
+            "type": "java",
+            "name": "Attach to Running App",
+            "request": "attach",
+            "hostName": "localhost",
+            "port": 5005
+        }
+    ]
+}

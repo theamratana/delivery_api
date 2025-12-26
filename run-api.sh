@@ -20,12 +20,14 @@ Commands:
   rebuild       Quick rebuild with latest code (uses cache, faster) 🔄
   start-clean   Full clean rebuild (no cache, guaranteed fresh) 🧹
   clean         Alias for start-clean
+  debug         Start API in debug mode (port 5005) with Docker PostgreSQL 🐛
   help          Show this help message
 
 Examples:
   ./run-api.sh start          # Normal start
   ./run-api.sh rebuild        # After code changes (recommended)
   ./run-api.sh start-clean    # When rebuild doesn't work
+  ./run-api.sh debug          # Debug mode (attach debugger to port 5005)
   ./run-api.sh stop           # Stop everything
 
 Access API at: http://localhost:${SERVER_PORT}/api/
@@ -210,6 +212,41 @@ case "$cmd" in
 			echo "❌ Docker not available. Use './run-api.sh restart' for local mode."
 			exit 1
 		fi
+		;;
+	debug)
+		# Start in debug mode with Docker PostgreSQL
+		echo "🐛 Starting API in DEBUG MODE..."
+		
+		# Ensure Docker PostgreSQL is running
+		if docker_available; then
+			echo "   Step 1: Starting PostgreSQL container..."
+			docker compose up -d postgres
+			sleep 3
+		else
+			echo "❌ Docker not available. Cannot start PostgreSQL."
+			exit 1
+		fi
+		
+		# Stop any existing API process
+		if port_in_use "$SERVER_PORT"; then
+			echo "   Step 2: Stopping existing API process..."
+			kill_on_port "$SERVER_PORT"
+			wait_for_port_free "$SERVER_PORT" 10
+		fi
+		
+		echo "   Step 3: Building project..."
+		./gradlew build -x test
+		
+		echo "   Step 4: Starting API with remote debugging..."
+		echo "   🐛 Debug port: 5005"
+		echo "   🌐 API port: ${SERVER_PORT}"
+		echo "   📍 Attach your debugger to localhost:5005"
+		echo ""
+		echo "   Starting in foreground (Ctrl+C to stop)..."
+		echo "================================================"
+		
+		# Run with debug JVM options
+		./gradlew bootRun --args="--debug" -Dorg.gradle.jvmargs="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
 		;;
 	start|*)
 		# Check if Docker is available and start via Docker

@@ -172,8 +172,9 @@ public class ProductController {
             }
                     Product updatedProduct = productService.updateProduct(productId, currentUser,
                             request.getName(), request.getDescription(),
-                            request.getCategory(), request.getDefaultPrice(),
-                                request.getBuyingPrice(), request.getSellingPrice(), request.getLastSellPrice(), request.getIsPublished(), request.getProductPhotos());
+                            request.getCategory(),
+                                request.getBuyingPrice(), request.getSellingPrice(), request.getIsPublished(),
+                                request.getAttributes(), request.getProductPhotos());
             return ResponseEntity.ok(updatedProduct);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -202,7 +203,9 @@ public class ProductController {
             }
                 log.debug("createProduct: calling productService.createProduct");
                 Product created = productService.createProduct(currentUser,
-                    request.getName(), request.getDescription(), request.getCategory(), request.getDefaultPrice(), request.getBuyingPrice(), request.getSellingPrice(), request.getLastSellPrice(), request.getIsPublished(), request.getProductPhotos());
+                    request.getName(), request.getDescription(), request.getCategory(),
+                    request.getBuyingPrice(), request.getSellingPrice(), request.getIsPublished(),
+                    request.getAttributes(), request.getProductPhotos());
                 log.debug("createProduct: productService.createProduct returned id={}", created.getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(ProductDTO.fromProduct(created));
         } catch (IllegalArgumentException e) {
@@ -302,20 +305,17 @@ public class ProductController {
         @JsonProperty("category")
         private ProductCategory category;
 
-        @JsonProperty("defaultPrice")
-        private java.math.BigDecimal defaultPrice;
-        
         @JsonProperty("buyingPrice")
         private java.math.BigDecimal buyingPrice;
 
         @JsonProperty("sellingPrice")
         private java.math.BigDecimal sellingPrice;
-        
-        @JsonProperty("lastSellPrice")
-        private java.math.BigDecimal lastSellPrice;
 
         @JsonProperty("isPublished")
         private Boolean isPublished;
+
+        @JsonProperty("attributes")
+        private String attributes;
 
         @JsonProperty("productPhotos")
         private java.util.List<String> productPhotos;
@@ -330,16 +330,14 @@ public class ProductController {
         public ProductCategory getCategory() { return category; }
         public void setCategory(ProductCategory category) { this.category = category; }
 
-        public java.math.BigDecimal getDefaultPrice() { return defaultPrice; }
-        public void setDefaultPrice(java.math.BigDecimal defaultPrice) { this.defaultPrice = defaultPrice; }
         public java.math.BigDecimal getBuyingPrice() { return buyingPrice; }
         public void setBuyingPrice(java.math.BigDecimal buyingPrice) { this.buyingPrice = buyingPrice; }
         public java.math.BigDecimal getSellingPrice() { return sellingPrice; }
         public void setSellingPrice(java.math.BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
-        public java.math.BigDecimal getLastSellPrice() { return lastSellPrice; }
-        public void setLastSellPrice(java.math.BigDecimal lastSellPrice) { this.lastSellPrice = lastSellPrice; }
         public Boolean getIsPublished() { return isPublished; }
         public void setIsPublished(Boolean isPublished) { this.isPublished = isPublished; }
+        public String getAttributes() { return attributes; }
+        public void setAttributes(String attributes) { this.attributes = attributes; }
         public java.util.List<String> getProductPhotos() { return productPhotos; }
         public void setProductPhotos(java.util.List<String> productPhotos) { this.productPhotos = productPhotos; }
     }
@@ -354,20 +352,17 @@ public class ProductController {
         @JsonProperty("category")
         private ProductCategory category;
 
-        @JsonProperty("defaultPrice")
-        private java.math.BigDecimal defaultPrice;
-
         @JsonProperty("buyingPrice")
         private java.math.BigDecimal buyingPrice;
 
         @JsonProperty("sellingPrice")
         private java.math.BigDecimal sellingPrice;
-        
-        @JsonProperty("lastSellPrice")
-        private java.math.BigDecimal lastSellPrice;
 
         @JsonProperty("isPublished")
         private Boolean isPublished;
+
+        @JsonProperty("attributes")
+        private String attributes;
 
         public String getName() { return name; }
         public void setName(String name) { this.name = name; }
@@ -375,16 +370,14 @@ public class ProductController {
         public void setDescription(String description) { this.description = description; }
         public ProductCategory getCategory() { return category; }
         public void setCategory(ProductCategory category) { this.category = category; }
-        public java.math.BigDecimal getDefaultPrice() { return defaultPrice; }
-        public void setDefaultPrice(java.math.BigDecimal defaultPrice) { this.defaultPrice = defaultPrice; }
         public java.math.BigDecimal getBuyingPrice() { return buyingPrice; }
         public void setBuyingPrice(java.math.BigDecimal buyingPrice) { this.buyingPrice = buyingPrice; }
         public java.math.BigDecimal getSellingPrice() { return sellingPrice; }
         public void setSellingPrice(java.math.BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
-        public java.math.BigDecimal getLastSellPrice() { return lastSellPrice; }
-        public void setLastSellPrice(java.math.BigDecimal lastSellPrice) { this.lastSellPrice = lastSellPrice; }
         public Boolean getIsPublished() { return isPublished; }
         public void setIsPublished(Boolean isPublished) { this.isPublished = isPublished; }
+        public String getAttributes() { return attributes; }
+        public void setAttributes(String attributes) { this.attributes = attributes; }
 
         @JsonProperty("productPhotos")
         private java.util.List<String> productPhotos;

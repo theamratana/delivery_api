@@ -55,9 +55,6 @@ public class ProductService {
         product.setCompany(company);
         product.setName(itemDescription.length() > 100 ? itemDescription.substring(0, 100) : itemDescription);
         product.setDescription(itemDescription);
-        product.setDefaultPrice(itemValue);
-        product.setLastSellPrice(itemValue);
-        product.setLastSellPrice(itemValue);
         product.setCategory(getDefaultCategory()); // Default category
         product.setIsActive(true);
 
@@ -93,10 +90,6 @@ public class ProductService {
         List<Product> existingProducts = productRepository.searchProductsByName(company.getId(), itemDescription);
         if (!existingProducts.isEmpty()) {
             Product existing = existingProducts.get(0);
-            // Update usage statistics
-            existing.setUsageCount(existing.getUsageCount() + 1);
-            existing.setLastUsedAt(OffsetDateTime.now());
-            productRepository.save(existing);
             log.info("Using existing product: {} for company: {}", existing.getId(), company.getId());
             return existing;
         }
@@ -106,7 +99,6 @@ public class ProductService {
         product.setCompany(company);
         product.setName(itemDescription.length() > 100 ? itemDescription.substring(0, 100) : itemDescription);
         product.setDescription(itemDescription);
-        product.setDefaultPrice(itemValue);
         product.setCategory(getDefaultCategory()); // Default category
         product.setIsActive(true);
 
@@ -136,7 +128,7 @@ public class ProductService {
         if (user.getCompany() == null) {
             return List.of();
         }
-        return productRepository.findByCompanyIdAndIsActiveTrueOrderByUsageCountDesc(user.getCompany().getId());
+        return productRepository.findByCompanyIdAndIsActiveTrueOrderByCreatedAtDesc(user.getCompany().getId());
     }
 
     public List<Product> searchCompanyProducts(User user, String searchTerm) {
@@ -166,9 +158,9 @@ public class ProductService {
 
     @Transactional
     public Product updateProduct(UUID productId, User user, String name, String description,
-                               ProductCategory category, BigDecimal defaultPrice,
-                               BigDecimal buyingPrice, BigDecimal sellingPrice, BigDecimal lastSellPrice, Boolean isPublished,
-                               java.util.List<String> productPhotos) {
+                               ProductCategory category,
+                               BigDecimal buyingPrice, BigDecimal sellingPrice, Boolean isPublished,
+                               String attributes, java.util.List<String> productPhotos) {
         if (productId == null) {
             throw new IllegalArgumentException("Product ID is required");
         }
@@ -194,20 +186,17 @@ public class ProductService {
         if (category != null) {
             product.setCategory(category);
         }
-        if (defaultPrice != null) {
-            product.setDefaultPrice(defaultPrice);
-        }
         if (buyingPrice != null) {
             product.setBuyingPrice(buyingPrice);
         }
         if (sellingPrice != null) {
             product.setSellingPrice(sellingPrice);
         }
-        if (lastSellPrice != null) {
-            product.setLastSellPrice(lastSellPrice);
-        }
         if (isPublished != null) {
             product.setIsPublished(isPublished);
+        }
+        if (attributes != null) {
+            product.setAttributes(attributes);
         }
         if (productPhotos != null) {
             List<com.delivery.deliveryapi.model.ProductPhoto> mapped = mapToProductPhotos(product, productPhotos);
@@ -219,9 +208,9 @@ public class ProductService {
 
     @Transactional
     public Product createProduct(User user, String name, String description,
-                                 ProductCategory category, BigDecimal defaultPrice,
-                                 BigDecimal buyingPrice, BigDecimal sellingPrice, BigDecimal lastSellPrice, Boolean isPublished,
-                                 java.util.List<String> productPhotos) {
+                                 ProductCategory category,
+                                 BigDecimal buyingPrice, BigDecimal sellingPrice, Boolean isPublished,
+                                 String attributes, java.util.List<String> productPhotos) {
         if (user.getCompany() == null) {
             throw new IllegalArgumentException("User must belong to a company to create products");
         }
@@ -230,11 +219,10 @@ public class ProductService {
         product.setName(name != null ? name.trim() : null);
         product.setDescription(description);
         product.setCategory(category != null ? category : getDefaultCategory());
-        product.setDefaultPrice(defaultPrice != null ? defaultPrice : java.math.BigDecimal.ZERO);
         product.setBuyingPrice(buyingPrice != null ? buyingPrice : java.math.BigDecimal.ZERO);
         product.setSellingPrice(sellingPrice != null ? sellingPrice : java.math.BigDecimal.ZERO);
-        product.setLastSellPrice(lastSellPrice != null ? lastSellPrice : java.math.BigDecimal.ZERO);
         product.setIsPublished(isPublished != null ? isPublished : Boolean.FALSE);
+        product.setAttributes(attributes);
         if (productPhotos != null) {
             List<com.delivery.deliveryapi.model.ProductPhoto> mapped = mapToProductPhotos(product, productPhotos);
             product.setProductPhotos(mapped);

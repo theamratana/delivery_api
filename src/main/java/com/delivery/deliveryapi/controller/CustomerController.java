@@ -24,7 +24,6 @@ import com.delivery.deliveryapi.model.District;
 import com.delivery.deliveryapi.model.Province;
 import com.delivery.deliveryapi.model.User;
 import com.delivery.deliveryapi.model.UserType;
-import com.delivery.deliveryapi.repo.DeliveryItemRepository;
 import com.delivery.deliveryapi.repo.DistrictRepository;
 import com.delivery.deliveryapi.repo.ProvinceRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
@@ -40,14 +39,12 @@ public class CustomerController {
     private final UserRepository userRepository;
     private final DistrictRepository districtRepository;
     private final ProvinceRepository provinceRepository;
-    private final DeliveryItemRepository deliveryItemRepository;
 
     public CustomerController(UserRepository userRepository, DistrictRepository districtRepository,
-                             ProvinceRepository provinceRepository, DeliveryItemRepository deliveryItemRepository) {
+                             ProvinceRepository provinceRepository) {
         this.userRepository = userRepository;
         this.districtRepository = districtRepository;
         this.provinceRepository = provinceRepository;
-        this.deliveryItemRepository = deliveryItemRepository;
     }
 
     @GetMapping
@@ -73,7 +70,7 @@ public class CustomerController {
             }
 
             var response = customers.stream()
-                .map(c -> new CustomerResponse(c, deliveryItemRepository, provinceRepository, districtRepository))
+                .map(c -> new CustomerResponse(c, provinceRepository, districtRepository))
                 .collect(Collectors.toList());
 
             return ResponseEntity.ok(response);
@@ -103,7 +100,7 @@ public class CustomerController {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
 
-            return ResponseEntity.ok(new CustomerResponse(customer, deliveryItemRepository, provinceRepository, districtRepository));
+            return ResponseEntity.ok(new CustomerResponse(customer, provinceRepository, districtRepository));
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
         }
@@ -151,7 +148,7 @@ public class CustomerController {
 
             userRepository.save(customer);
 
-            return ResponseEntity.ok(new CustomerResponse(customer, deliveryItemRepository, provinceRepository, districtRepository));
+            return ResponseEntity.ok(new CustomerResponse(customer, provinceRepository, districtRepository));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", e.getMessage()));
@@ -202,7 +199,7 @@ public class CustomerController {
             customer = userRepository.save(customer);
 
             return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new CustomerResponse(customer, deliveryItemRepository, provinceRepository, districtRepository));
+                .body(new CustomerResponse(customer, provinceRepository, districtRepository));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", e.getMessage()));
@@ -278,8 +275,7 @@ public class CustomerController {
         @JsonProperty("lastDeliveryDate")
         public String lastDeliveryDate;
 
-        public CustomerResponse(User customer, DeliveryItemRepository deliveryRepo, 
-                               ProvinceRepository provinceRepo, DistrictRepository districtRepo) {
+        public CustomerResponse(User customer, ProvinceRepository provinceRepo, DistrictRepository districtRepo) {
             this.id = customer.getId().toString();
             this.phone = customer.getPhoneE164();
             this.name = customer.getDisplayName();
@@ -297,14 +293,9 @@ public class CustomerController {
                     .orElse(null);
             }
 
-            // Count deliveries
-            this.totalDeliveries = deliveryRepo.countByReceiverIdAndDeletedFalse(customer.getId());
-            
-            // Get last delivery date
-            var lastDelivery = deliveryRepo.findByReceiverIdAndDeletedFalseOrderByCreatedAtDesc(customer.getId())
-                .stream()
-                .findFirst();
-            this.lastDeliveryDate = lastDelivery.map(d -> d.getCreatedAt().toString()).orElse(null);
+            // Delivery module removed - set defaults
+            this.totalDeliveries = 0L;
+            this.lastDeliveryDate = null;
         }
     }
 }

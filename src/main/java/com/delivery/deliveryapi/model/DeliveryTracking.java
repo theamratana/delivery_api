@@ -4,50 +4,29 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
 @Entity
-@Table(name = "delivery_tracking",
-    indexes = {
-        @Index(name = "idx_delivery_tracking_delivery_item_id", columnList = "delivery_item_id"),
-        @Index(name = "idx_delivery_tracking_status", columnList = "status"),
-        @Index(name = "idx_delivery_tracking_timestamp", columnList = "timestamp"),
-        @Index(name = "idx_delivery_tracking_updated_by", columnList = "updated_by"),
-        @Index(name = "idx_delivery_tracking_created_at", columnList = "created_at")
-    }
-)
-public class DeliveryTracking extends AuditableEntity {
+@Table(name = "delivery_tracking")
+public class DeliveryTracking {
 
     @Id
-    @Column(name = "id", nullable = false, updatable = false)
-    private UUID id = UUID.randomUUID();
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "delivery_item_id", nullable = false)
-    private DeliveryItem deliveryItem;
+    @JoinColumn(name = "delivery_package_id", nullable = false)
+    private DeliveryPackage deliveryPackage;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", nullable = false, length = 50)
     private DeliveryStatus status;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
     @Column(name = "timestamp", nullable = false)
-    private OffsetDateTime timestamp;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "status_updated_by")
-    private User statusUpdatedBy;
+    private OffsetDateTime timestamp = OffsetDateTime.now();
 
     @Column(name = "location", columnDefinition = "TEXT")
     private String location;
@@ -58,23 +37,32 @@ public class DeliveryTracking extends AuditableEntity {
     @Column(name = "longitude", precision = 11, scale = 8)
     private BigDecimal longitude;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "updated_by")
+    private User updatedBy;
+
+    @Column(name = "created_at")
+    private OffsetDateTime createdAt = OffsetDateTime.now();
+
+    @Column(name = "deleted")
+    private Boolean deleted = false;
+
     // Constructors
     public DeliveryTracking() {}
 
-    public DeliveryTracking(DeliveryItem deliveryItem, DeliveryStatus status, String description, User statusUpdatedBy) {
-        this.deliveryItem = deliveryItem;
+    public DeliveryTracking(DeliveryPackage deliveryPackage, DeliveryStatus status, String description) {
+        this.deliveryPackage = deliveryPackage;
         this.status = status;
         this.description = description;
-        this.statusUpdatedBy = statusUpdatedBy;
         this.timestamp = OffsetDateTime.now();
     }
 
-    // Getters and setters
+    // Getters and Setters
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
 
-    public DeliveryItem getDeliveryItem() { return deliveryItem; }
-    public void setDeliveryItem(DeliveryItem deliveryItem) { this.deliveryItem = deliveryItem; }
+    public DeliveryPackage getDeliveryPackage() { return deliveryPackage; }
+    public void setDeliveryPackage(DeliveryPackage deliveryPackage) { this.deliveryPackage = deliveryPackage; }
 
     public DeliveryStatus getStatus() { return status; }
     public void setStatus(DeliveryStatus status) { this.status = status; }
@@ -85,9 +73,6 @@ public class DeliveryTracking extends AuditableEntity {
     public OffsetDateTime getTimestamp() { return timestamp; }
     public void setTimestamp(OffsetDateTime timestamp) { this.timestamp = timestamp; }
 
-    public User getStatusUpdatedBy() { return statusUpdatedBy; }
-    public void setStatusUpdatedBy(User statusUpdatedBy) { this.statusUpdatedBy = statusUpdatedBy; }
-
     public String getLocation() { return location; }
     public void setLocation(String location) { this.location = location; }
 
@@ -96,4 +81,13 @@ public class DeliveryTracking extends AuditableEntity {
 
     public BigDecimal getLongitude() { return longitude; }
     public void setLongitude(BigDecimal longitude) { this.longitude = longitude; }
+
+    public User getUpdatedBy() { return updatedBy; }
+    public void setUpdatedBy(User updatedBy) { this.updatedBy = updatedBy; }
+
+    public OffsetDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Boolean getDeleted() { return deleted; }
+    public void setDeleted(Boolean deleted) { this.deleted = deleted; }
 }
