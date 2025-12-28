@@ -74,7 +74,7 @@ public class ProductCategoryService {
     }
 
     @Transactional
-    public ProductCategory updateCategory(java.util.UUID categoryId, String name, String khmerName, Integer sortOrder, Boolean isActive) {
+    public ProductCategory updateCategory(java.util.UUID categoryId, String code, String name, String khmerName, Integer sortOrder, Boolean isActive) {
         if (categoryId == null) {
             throw new IllegalArgumentException("Category ID is required");
         }
@@ -85,7 +85,19 @@ public class ProductCategoryService {
         }
 
         ProductCategory category = categoryOpt.get();
-
+        
+        // Check if code is being changed and if new code already exists
+        if (code != null && !code.trim().isEmpty()) {
+            String trimmedCode = code.trim();
+            if (!trimmedCode.equals(category.getCode())) {
+                // Code is being changed, check if it already exists
+                if (productCategoryRepository.existsByCode(trimmedCode)) {
+                    throw new IllegalArgumentException("Category code already exists: " + trimmedCode);
+                }
+            }
+            category.setCode(trimmedCode);
+        }
+        
         if (name != null && !name.trim().isEmpty()) {
             category.setName(name.trim());
         }
