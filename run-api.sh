@@ -13,22 +13,23 @@ show_help() {
 Usage: ./run-api.sh [command]
 
 Commands:
-  start         Start API (uses existing Docker image if available)
-  stop          Stop API and containers
+  start         Start API locally with Gradle (PostgreSQL in Docker)
+  stop          Stop API (keeps PostgreSQL running)
   restart       Stop then start API
   status        Check if API is running
-  rebuild       Quick rebuild with latest code (uses cache, faster) 🔄
-  start-clean   Full clean rebuild (no cache, guaranteed fresh) 🧹
-  clean         Alias for start-clean
-  debug         Start API in debug mode (port 5005) with Docker PostgreSQL 🐛
+  debug         Start API in debug mode (port 5005) 🐛
   help          Show this help message
 
 Examples:
-  ./run-api.sh start          # Normal start
-  ./run-api.sh rebuild        # After code changes (recommended)
-  ./run-api.sh start-clean    # When rebuild doesn't work
+  ./run-api.sh start          # Start API locally
+  ./run-api.sh restart        # Restart API after code changes
   ./run-api.sh debug          # Debug mode (attach debugger to port 5005)
-  ./run-api.sh stop           # Stop everything
+  ./run-api.sh stop           # Stop API (PostgreSQL stays running)
+
+Notes:
+  - API runs locally via Gradle bootRun
+  - PostgreSQL runs in Docker on port 5433
+  - To stop PostgreSQL: docker compose down
 
 Access API at: http://localhost:${SERVER_PORT}/api/
 EOF
@@ -116,12 +117,8 @@ case "$cmd" in
 		show_help
 		;;
 	stop)
-		# Try to stop Docker containers first
-		if docker_available; then
-			echo "Stopping Docker containers..."
-			docker compose down 2>/dev/null || echo "⚠️  No Docker containers to stop"
-		fi
-		# Also stop any local process on the port
+		# Stop local API process (keep PostgreSQL running in Docker)
+		# If you want to stop PostgreSQL too, use: docker compose down
 		echo "Stopping API server on port ${SERVER_PORT}..."
 		if port_in_use "$SERVER_PORT"; then
 			kill_on_port "$SERVER_PORT"
@@ -136,16 +133,13 @@ case "$cmd" in
 		fi
 		;;
 	status)
-		# Check Docker first
-		if docker_api_running; then
-			echo "✅ API running in Docker (container: roluun-api)"
+		# Check if API is running locally
+		if port_in_use "$SERVER_PORT"; then
+			echo "✅ API server running on port ${SERVER_PORT}"
 			echo "   Access at: http://localhost:${SERVER_PORT}/api/"
 			exit 0
-		elif port_in_use "$SERVER_PORT"; then
-			echo "✅ Port ${SERVER_PORT} is IN USE (API server running locally)"
-			exit 0
 		else
-			echo "ℹ️  Port ${SERVER_PORT} is FREE (no API server running)"
+			echo "ℹ️  API server not running (port ${SERVER_PORT} is free)"
 			exit 1
 		fi
 		;;
@@ -158,60 +152,6 @@ case "$cmd" in
 		fi
 		sleep 1
 		"$0" start
-		;;
-	rebuild)
-		# Quick rebuild (uses Gradle cache, faster)
-		if docker_available; then
-			echo "🔄 Rebuilding with latest code..."
-			echo "   Step 1: Stopping API container..."
-			docker compose stop api
-			echo "   Step 2: Building Gradle (incremental)..."
-			./gradlew build -x test
-			echo "   Step 3: Rebuilding Docker image..."
-			docker compose build api
-			echo "   Step 4: Starting containers..."
-			docker compose up -d postgres api
-			echo "✅ Docker containers started with latest code"
-			echo "   Waiting for API to be ready..."
-			sleep 10
-			if curl -s http://localhost:${SERVER_PORT}/api/auth/dev/token/00000000-0000-0000-0000-000000000000 >/dev/null 2>&1; then
-				echo "✅ API is ready!"
-				echo "   Access at: http://localhost:${SERVER_PORT}/api/"
-			else
-				echo "⚠️  API started but may still be initializing. Check logs: docker compose logs api"
-			fi
-			exit 0
-		else
-			echo "❌ Docker not available. Use './run-api.sh restart' for local mode."
-			exit 1
-		fi
-		;;
-	start-clean|clean)
-		# Force full clean rebuild (no cache, slower but guaranteed fresh)
-		if docker_available; then
-			echo "🧹 Cleaning and rebuilding Docker image with latest code..."
-			echo "   Step 1: Stopping containers..."
-			docker compose down
-			echo "   Step 2: Building Gradle (clean)..."
-			./gradlew clean build -x test
-			echo "   Step 3: Rebuilding Docker image (no cache)..."
-			docker compose build --no-cache api
-			echo "   Step 4: Starting containers..."
-			docker compose up -d postgres api
-			echo "✅ Docker containers started with fresh build"
-			echo "   Waiting for API to be ready..."
-			sleep 10
-			if curl -s http://localhost:${SERVER_PORT}/api/auth/dev/token/00000000-0000-0000-0000-000000000000 >/dev/null 2>&1; then
-				echo "✅ API is ready!"
-				echo "   Access at: http://localhost:${SERVER_PORT}/api/"
-			else
-				echo "⚠️  API started but may still be initializing. Check logs: docker compose logs api"
-			fi
-			exit 0
-		else
-			echo "❌ Docker not available. Use './run-api.sh restart' for local mode."
-			exit 1
-		fi
 		;;
 	debug)
 		# Start in debug mode with Docker PostgreSQL
@@ -249,23 +189,16 @@ case "$cmd" in
 		./gradlew bootRun --args="--debug" -Dorg.gradle.jvmargs="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
 		;;
 	start|*)
-		# Check if Docker is available and start via Docker
+		# Start PostgreSQL in Docker, run API locally with Gradle
 		if docker_available; then
-			echo "🐳 Docker detected, starting API via docker-compose..."
-			docker compose up -d postgres api
-			echo "✅ Docker containers started"
-			echo "   Waiting for API to be ready..."
-			sleep 10
-			if curl -s http://localhost:${SERVER_PORT}/api/auth/dev/token/00000000-0000-0000-0000-000000000000 >/dev/null 2>&1; then
-				echo "✅ API is ready!"
-				echo "   Access at: http://localhost:${SERVER_PORT}/api/"
-			else
-				echo "⚠️  API started but may still be initializing. Check logs: docker compose logs api"
-			fi
-			exit 0
+			echo "🐳 Starting PostgreSQL in Docker..."
+			docker compose up -d postgres
+			sleep 3
+			echo "✅ PostgreSQL container started"
+		else
+			echo "⚠️  Docker not available. Ensure PostgreSQL is running on port 5433"
 		fi
 		
-		# Fallback to local Gradle run if Docker not available
 		# Ensure port is free (stop any existing process first)
 		if port_in_use "$SERVER_PORT"; then
 			echo "Port ${SERVER_PORT} is busy. Stopping existing process..."
