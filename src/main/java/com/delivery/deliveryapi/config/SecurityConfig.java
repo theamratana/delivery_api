@@ -15,7 +15,7 @@ import com.delivery.deliveryapi.security.JwtAuthenticationFilter;
 import com.delivery.deliveryapi.security.JwtService;
 
 @Configuration
-@EnableMethodSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     private final JwtService jwtService;

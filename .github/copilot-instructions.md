@@ -22,6 +22,11 @@
 
 - [x] Implement Interactive Reset Menu (added numbered options 0-5 for module selection instead of code editing)
 
+## Terminal Commands Best Practice
+- **Always add a space at the beginning of terminal commands** to prevent the first character from being lost during command execution. This is a known issue with the terminal.
+  - Example: ` cd /path/to/dir` instead of `cd /path/to/dir`
+  - Example: ` ./gradlew build` instead of `./gradlew build`
+
 - Work through each checklist item systematically.
 - Keep communication concise and focused.
 - Follow development best practices.

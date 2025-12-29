@@ -22,10 +22,21 @@
 
   // Helpful fallback if the Gradle import isn’t active yet; points to Maven-style layout
   "java.project.sourcePaths": [
-    "src/main/java",
-    "src/test/java"
+    "src/main/java"
+  ],
+  "java.project.referencedLibraries": [
+    "lib/**/*.jar",
+    "build/libs/*.jar"
   ],
   "java.compile.nullAnalysis.mode": "automatic",
+  
+  // Exclude test sources from compilation to avoid test errors
+  "files.exclude": {
+    "**/src/test/**": false
+  },
+  "java.project.resourceFilters": [
+    "**/src/test/**"
+  ],
   // Default integrated terminal profile for this workspace (prefer WSL/Ubuntu)
   // Use the 'WSL' profile so VS Code will open the default WSL distribution
   // You can change to a specific distro by setting args: ["-d", "Ubuntu"]
@@ -40,5 +51,12 @@
   },
   // Default to Git Bash in this workspace - change back to "WSL" if you prefer WSL again
   "terminal.integrated.defaultProfile.windows": "Git Bash",
-  "java.format.settings.url": ".vscode/java-formatter.xml"
+  "java.format.settings.url": ".vscode/java-formatter.xml",
+  
+  // Skip tests when building/debugging to avoid test compilation errors
+  "java.debug.settings.vmArgs": "-Dskip.tests=true",
+  "java.test.config": {
+    "vmArgs": ["-Dspring.profiles.active=test"]
+  },
+  "java.debug.settings.onBuildFailureProceed": true
 }

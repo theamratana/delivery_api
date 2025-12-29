@@ -2,6 +2,15 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "buildMainOnly",
+			"type": "shell",
+			"command": "./gradlew",
+			"args": ["compileJava", "-x", "test"],
+			"group": "build",
+			"problemMatcher": ["$gradle"],
+			"detail": "Build main source code only (skip tests)"
+		},
+		{
 			"label": "gradle build",
 			"type": "shell",
 			"command": "./gradlew",

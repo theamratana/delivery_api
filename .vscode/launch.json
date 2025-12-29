@@ -8,6 +8,7 @@
             "mainClass": "com.delivery.deliveryapi.DeliveryApiApplication",
             "args": "",
             "console": "integratedTerminal",
+            "preLaunchTask": "buildMainOnly",
             "env": {
                 "DB_URL": "jdbc:postgresql://localhost:5433/deliverydb",
                 "DB_USERNAME": "postgres",
