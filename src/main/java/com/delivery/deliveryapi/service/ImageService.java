@@ -34,7 +34,7 @@ public class ImageService {
 
     private static final String UPLOAD_DIR = "uploads/images/";
     private static final float JPEG_COMPRESSION_QUALITY = 0.8f; // 80% quality
-    private static final long MAX_FILE_SIZE_BYTES = 2L * 1024 * 1024; // 2MB
+    private static final long MAX_FILE_SIZE_BYTES = 50L * 1024 * 1024; // 50MB
     private static final String JPEG_CONTENT_TYPE = "image/jpeg";
 
     private final ImageRepository imageRepository;

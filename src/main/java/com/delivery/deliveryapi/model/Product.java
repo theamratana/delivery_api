@@ -56,12 +56,10 @@ public class Product extends AuditableEntity {
     @Column(name = "selling_price", precision = 10, scale = 2)
     private BigDecimal sellingPrice = java.math.BigDecimal.ZERO;
 
-    @Column(name = "weight_kg", precision = 5, scale = 2)
-    private BigDecimal weightKg;
+    @Column(name = "full_price", precision = 10, scale = 2)
+    private BigDecimal fullPrice = java.math.BigDecimal.ZERO;
 
-    @Column(name = "dimensions", length = 50)
-    private String dimensions; // e.g., "10x5x2cm"
-
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "attributes", columnDefinition = "jsonb")
     private String attributes; // JSONB for flexible attributes like color, size, material, etc.
 
@@ -106,11 +104,8 @@ public class Product extends AuditableEntity {
     public BigDecimal getSellingPrice() { return sellingPrice; }
     public void setSellingPrice(BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
 
-    public BigDecimal getWeightKg() { return weightKg; }
-    public void setWeightKg(BigDecimal weightKg) { this.weightKg = weightKg; }
-
-    public String getDimensions() { return dimensions; }
-    public void setDimensions(String dimensions) { this.dimensions = dimensions; }
+    public BigDecimal getFullPrice() { return fullPrice; }
+    public void setFullPrice(BigDecimal fullPrice) { this.fullPrice = fullPrice; }
 
     public String getAttributes() { return attributes; }
     public void setAttributes(String attributes) { this.attributes = attributes; }
