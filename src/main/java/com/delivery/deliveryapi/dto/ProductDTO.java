@@ -24,20 +24,20 @@ public class ProductDTO {
     @JsonProperty("categoryName")
     private String categoryName;
     
+    @JsonProperty("categoryKhmerName")
+    private String categoryKhmerName;
+    
     @JsonProperty("buyingPrice")
     private BigDecimal buyingPrice;
     
     @JsonProperty("sellingPrice")
     private BigDecimal sellingPrice;
     
+    @JsonProperty("fullPrice")
+    private BigDecimal fullPrice;
+    
     @JsonProperty("isPublished")
     private Boolean isPublished;
-    
-    @JsonProperty("weightKg")
-    private BigDecimal weightKg;
-    
-    @JsonProperty("dimensions")
-    private String dimensions;
     
     @JsonProperty("attributes")
     private String attributes;
@@ -76,9 +76,8 @@ public class ProductDTO {
         dto.setDescription(product.getDescription());
         dto.setBuyingPrice(product.getBuyingPrice());
         dto.setSellingPrice(product.getSellingPrice());
+        dto.setFullPrice(product.getFullPrice());
         dto.setIsPublished(product.getIsPublished());
-        dto.setWeightKg(product.getWeightKg());
-        dto.setDimensions(product.getDimensions());
         dto.setAttributes(product.getAttributes());
         dto.setIsActive(product.getIsActive());
         
@@ -90,6 +89,7 @@ public class ProductDTO {
         if (product.getCategory() != null) {
             dto.setCategoryId(product.getCategory().getId());
             dto.setCategoryName(product.getCategory().getName());
+            dto.setCategoryKhmerName(product.getCategory().getKhmerName());
         }
         if (product.getProductPhotos() != null) {
             java.util.List<ImageDTO> photos = product.getProductPhotos().stream()
@@ -117,20 +117,20 @@ public class ProductDTO {
     public String getCategoryName() { return categoryName; }
     public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
 
+    public String getCategoryKhmerName() { return categoryKhmerName; }
+    public void setCategoryKhmerName(String categoryKhmerName) { this.categoryKhmerName = categoryKhmerName; }
+
     public BigDecimal getBuyingPrice() { return buyingPrice; }
     public void setBuyingPrice(BigDecimal buyingPrice) { this.buyingPrice = buyingPrice; }
 
     public BigDecimal getSellingPrice() { return sellingPrice; }
     public void setSellingPrice(BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
 
+    public BigDecimal getFullPrice() { return fullPrice; }
+    public void setFullPrice(BigDecimal fullPrice) { this.fullPrice = fullPrice; }
+
     public Boolean getIsPublished() { return isPublished; }
     public void setIsPublished(Boolean isPublished) { this.isPublished = isPublished; }
-
-    public BigDecimal getWeightKg() { return weightKg; }
-    public void setWeightKg(BigDecimal weightKg) { this.weightKg = weightKg; }
-
-    public String getDimensions() { return dimensions; }
-    public void setDimensions(String dimensions) { this.dimensions = dimensions; }
 
     public String getAttributes() { return attributes; }
     public void setAttributes(String attributes) { this.attributes = attributes; }
