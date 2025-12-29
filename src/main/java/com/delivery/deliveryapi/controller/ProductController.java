@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -20,8 +21,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.delivery.deliveryapi.dto.ProductDTO;
+import com.delivery.deliveryapi.dto.ReorderPhotosRequest;
 import com.delivery.deliveryapi.model.Product;
-import com.delivery.deliveryapi.model.ProductCategory;
 import com.delivery.deliveryapi.model.User;
 import com.delivery.deliveryapi.repo.UserRepository;
 import com.delivery.deliveryapi.service.ProductService;
@@ -42,16 +43,18 @@ public class ProductController {
 
     @GetMapping
     @Transactional
-    public ResponseEntity<List<ProductDTO>> getCompanyProducts(@RequestParam(required = false) String search) {
+    public ResponseEntity<List<ProductDTO>> getCompanyProducts(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Boolean isActive) {
         try {
             User currentUser = getCurrentUser();
 
             // Regular users see only their company's products
             List<Product> products;
             if (search != null && !search.trim().isEmpty()) {
-                products = productService.searchCompanyProducts(currentUser, search.trim());
+                products = productService.searchCompanyProducts(currentUser, search.trim(), isActive);
             } else {
-                products = productService.getCompanyProducts(currentUser);
+                products = productService.getCompanyProducts(currentUser, isActive);
             }
 
             List<ProductDTO> productDTOs = products.stream()
@@ -89,6 +92,7 @@ public class ProductController {
             @RequestParam(required = false) String query,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) Boolean published,
+            @RequestParam(required = false) Boolean isActive,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int limit) {
         try {
@@ -97,9 +101,9 @@ public class ProductController {
             // Apply search filters
             List<Product> products;
             if (query != null && !query.trim().isEmpty()) {
-                products = productService.searchCompanyProducts(currentUser, query.trim());
+                products = productService.searchCompanyProducts(currentUser, query.trim(), isActive);
             } else {
-                products = productService.getCompanyProducts(currentUser);
+                products = productService.getCompanyProducts(currentUser, isActive);
             }
             
             // Filter by category if provided
@@ -160,7 +164,7 @@ public class ProductController {
     }
 
     @PutMapping("/{productId}")
-    public ResponseEntity<Product> updateProduct(@PathVariable UUID productId,
+    public ResponseEntity<ProductDTO> updateProduct(@PathVariable UUID productId,
                                                 @RequestBody UpdateProductRequest request) {
         try {
             User currentUser = getCurrentUser();
@@ -172,10 +176,10 @@ public class ProductController {
             }
                     Product updatedProduct = productService.updateProduct(productId, currentUser,
                             request.getName(), request.getDescription(),
-                            request.getCategory(),
-                                request.getBuyingPrice(), request.getSellingPrice(), request.getIsPublished(),
+                            request.getCategoryId(),
+                                request.getBuyingPrice(), request.getSellingPrice(), request.getFullPrice(), request.getIsPublished(),
                                 request.getAttributes(), request.getProductPhotos());
-            return ResponseEntity.ok(updatedProduct);
+            return ResponseEntity.ok(ProductDTO.fromProduct(updatedProduct));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(null);
@@ -203,8 +207,8 @@ public class ProductController {
             }
                 log.debug("createProduct: calling productService.createProduct");
                 Product created = productService.createProduct(currentUser,
-                    request.getName(), request.getDescription(), request.getCategory(),
-                    request.getBuyingPrice(), request.getSellingPrice(), request.getIsPublished(),
+                    request.getName(), request.getDescription(), request.getCategoryId(),
+                    request.getBuyingPrice(), request.getSellingPrice(), request.getFullPrice(), request.getIsPublished(),
                     request.getAttributes(), request.getProductPhotos());
                 log.debug("createProduct: productService.createProduct returned id={}", created.getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(ProductDTO.fromProduct(created));
@@ -214,8 +218,26 @@ public class ProductController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
-
+    @PatchMapping("/{productId}/photos/reorder")
+    public ResponseEntity<ProductDTO> reorderProductPhotos(@PathVariable UUID productId, @RequestBody ReorderPhotosRequest request) {
+        try {
+            User currentUser = getCurrentUser();
+            var role = currentUser.getUserRole();
+            if (role == null || (role != com.delivery.deliveryapi.model.UserRole.OWNER
+                    && role != com.delivery.deliveryapi.model.UserRole.MANAGER
+                    && role != com.delivery.deliveryapi.model.UserRole.STAFF)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+            }
+            Product updated = productService.reorderProductPhotos(productId, currentUser, request.getPhotos());
+            return ResponseEntity.ok(ProductDTO.fromProduct(updated));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
     @PostMapping("/{productId}/photos")
+    @Transactional
     public ResponseEntity<ProductDTO> addPhotoToProduct(@PathVariable UUID productId, @RequestBody AddPhotoRequest request) {
         try {
             User currentUser = getCurrentUser();
@@ -226,10 +248,16 @@ public class ProductController {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
             }
             Product updated = productService.addPhotoToProduct(productId, currentUser, request.getImageRef());
+            // Force load lazy associations before converting to DTO
+            updated.getCompany().getName();
+            updated.getCategory().getName();
+            updated.getProductPhotos().size();
             return ResponseEntity.ok(ProductDTO.fromProduct(updated));
         } catch (IllegalArgumentException e) {
+            log.error("Bad request in addPhotoToProduct: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         } catch (Exception e) {
+            log.error("Error in addPhotoToProduct", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -238,17 +266,23 @@ public class ProductController {
     public ResponseEntity<ProductDTO> removePhotoFromProduct(@PathVariable UUID productId, @PathVariable UUID photoId) {
         try {
             User currentUser = getCurrentUser();
+            log.info("DELETE photo request - User: {}, Role: {}, ProductId: {}, PhotoId: {}", 
+                currentUser.getId(), currentUser.getUserRole(), productId, photoId);
             var role = currentUser.getUserRole();
             if (role == null || (role != com.delivery.deliveryapi.model.UserRole.OWNER
                     && role != com.delivery.deliveryapi.model.UserRole.MANAGER
                     && role != com.delivery.deliveryapi.model.UserRole.STAFF)) {
+                log.warn("DELETE photo rejected - insufficient role: {}", role);
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
             }
             Product updated = productService.removePhotoFromProduct(productId, currentUser, photoId);
+            log.info("Photo deleted successfully - ProductId: {}, PhotoId: {}", productId, photoId);
             return ResponseEntity.ok(ProductDTO.fromProduct(updated));
         } catch (IllegalArgumentException e) {
+            log.error("DELETE photo failed - IllegalArgumentException: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         } catch (Exception e) {
+            log.error("DELETE photo failed - Exception: ", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -271,6 +305,69 @@ public class ProductController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to deactivate product");
+        }
+    }
+
+    @PostMapping("/{productId}/activate")
+    public ResponseEntity<String> activateProduct(@PathVariable UUID productId) {
+        try {
+            User currentUser = getCurrentUser();
+            var role = currentUser.getUserRole();
+            if (role == null || (role != com.delivery.deliveryapi.model.UserRole.OWNER
+                    && role != com.delivery.deliveryapi.model.UserRole.MANAGER
+                    && role != com.delivery.deliveryapi.model.UserRole.STAFF)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Not authorized");
+            }
+            productService.activateProduct(productId, currentUser);
+            return ResponseEntity.ok("Product activated successfully");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to activate product");
+        }
+    }
+
+    @PostMapping("/{productId}/publish")
+    public ResponseEntity<String> publishProduct(@PathVariable UUID productId) {
+        try {
+            User currentUser = getCurrentUser();
+            var role = currentUser.getUserRole();
+            if (role == null || (role != com.delivery.deliveryapi.model.UserRole.OWNER
+                    && role != com.delivery.deliveryapi.model.UserRole.MANAGER
+                    && role != com.delivery.deliveryapi.model.UserRole.STAFF)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Not authorized");
+            }
+            productService.publishProduct(productId, currentUser);
+            return ResponseEntity.ok("Product published successfully");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to publish product");
+        }
+    }
+
+    @PostMapping("/{productId}/unpublish")
+    public ResponseEntity<String> unpublishProduct(@PathVariable UUID productId) {
+        try {
+            User currentUser = getCurrentUser();
+            var role = currentUser.getUserRole();
+            if (role == null || (role != com.delivery.deliveryapi.model.UserRole.OWNER
+                    && role != com.delivery.deliveryapi.model.UserRole.MANAGER
+                    && role != com.delivery.deliveryapi.model.UserRole.STAFF)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Not authorized");
+            }
+            productService.unpublishProduct(productId, currentUser);
+            return ResponseEntity.ok("Product unpublished successfully");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to unpublish product");
         }
     }
 
@@ -302,14 +399,17 @@ public class ProductController {
         @JsonProperty("description")
         private String description;
 
-        @JsonProperty("category")
-        private ProductCategory category;
+        @JsonProperty("categoryId")
+        private UUID categoryId;
 
         @JsonProperty("buyingPrice")
         private java.math.BigDecimal buyingPrice;
 
         @JsonProperty("sellingPrice")
         private java.math.BigDecimal sellingPrice;
+
+        @JsonProperty("fullPrice")
+        private java.math.BigDecimal fullPrice;
 
         @JsonProperty("isPublished")
         private Boolean isPublished;
@@ -327,13 +427,15 @@ public class ProductController {
         public String getDescription() { return description; }
         public void setDescription(String description) { this.description = description; }
 
-        public ProductCategory getCategory() { return category; }
-        public void setCategory(ProductCategory category) { this.category = category; }
+        public UUID getCategoryId() { return categoryId; }
+        public void setCategoryId(UUID categoryId) { this.categoryId = categoryId; }
 
         public java.math.BigDecimal getBuyingPrice() { return buyingPrice; }
         public void setBuyingPrice(java.math.BigDecimal buyingPrice) { this.buyingPrice = buyingPrice; }
         public java.math.BigDecimal getSellingPrice() { return sellingPrice; }
         public void setSellingPrice(java.math.BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
+        public java.math.BigDecimal getFullPrice() { return fullPrice; }
+        public void setFullPrice(java.math.BigDecimal fullPrice) { this.fullPrice = fullPrice; }
         public Boolean getIsPublished() { return isPublished; }
         public void setIsPublished(Boolean isPublished) { this.isPublished = isPublished; }
         public String getAttributes() { return attributes; }
@@ -349,14 +451,17 @@ public class ProductController {
         @JsonProperty("description")
         private String description;
 
-        @JsonProperty("category")
-        private ProductCategory category;
+        @JsonProperty("categoryId")
+        private UUID categoryId;
 
         @JsonProperty("buyingPrice")
         private java.math.BigDecimal buyingPrice;
 
         @JsonProperty("sellingPrice")
         private java.math.BigDecimal sellingPrice;
+
+        @JsonProperty("fullPrice")
+        private java.math.BigDecimal fullPrice;
 
         @JsonProperty("isPublished")
         private Boolean isPublished;
@@ -368,12 +473,14 @@ public class ProductController {
         public void setName(String name) { this.name = name; }
         public String getDescription() { return description; }
         public void setDescription(String description) { this.description = description; }
-        public ProductCategory getCategory() { return category; }
-        public void setCategory(ProductCategory category) { this.category = category; }
+        public UUID getCategoryId() { return categoryId; }
+        public void setCategoryId(UUID categoryId) { this.categoryId = categoryId; }
         public java.math.BigDecimal getBuyingPrice() { return buyingPrice; }
         public void setBuyingPrice(java.math.BigDecimal buyingPrice) { this.buyingPrice = buyingPrice; }
         public java.math.BigDecimal getSellingPrice() { return sellingPrice; }
         public void setSellingPrice(java.math.BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
+        public java.math.BigDecimal getFullPrice() { return fullPrice; }
+        public void setFullPrice(java.math.BigDecimal fullPrice) { this.fullPrice = fullPrice; }
         public Boolean getIsPublished() { return isPublished; }
         public void setIsPublished(Boolean isPublished) { this.isPublished = isPublished; }
         public String getAttributes() { return attributes; }
