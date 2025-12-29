@@ -13,6 +13,8 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     List<Product> findByCompanyIdAndIsActiveTrueOrderByCreatedAtDesc(UUID companyId);
 
+    List<Product> findByCompanyIdOrderByCreatedAtDesc(UUID companyId);
+
     List<Product> findByCompanyIdAndCategoryIdAndIsActiveTrueOrderByCreatedAtDesc(UUID companyId, UUID categoryId);
 
     @Query("SELECT p FROM Product p WHERE p.company.id = :companyId AND p.isActive = true ORDER BY p.createdAt DESC")
@@ -20,6 +22,9 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     @Query("SELECT p FROM Product p WHERE p.company.id = :companyId AND p.isActive = true AND LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) ORDER BY p.createdAt DESC")
     List<Product> searchProductsByName(@Param("companyId") UUID companyId, @Param("searchTerm") String searchTerm);
+
+    @Query("SELECT p FROM Product p WHERE p.company.id = :companyId AND LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) ORDER BY p.createdAt DESC")
+    List<Product> searchAllProductsByName(@Param("companyId") UUID companyId, @Param("searchTerm") String searchTerm);
 
     List<Product> findByIsActiveTrueOrderByCreatedAtDesc();
 
