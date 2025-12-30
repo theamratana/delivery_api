@@ -105,6 +105,32 @@ public class CustomerController {
         }
     }
 
+    @GetMapping("/by-phone/{phone}")
+    public ResponseEntity<CustomerResponse> getCustomerByPhone(@PathVariable String phone) {
+        try {
+            User currentUser = getCurrentUser();
+            if (currentUser.getCompany() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+            }
+
+            Optional<User> optCustomer = userRepository.findByPhoneE164AndCompanyAndUserType(
+                phone,
+                currentUser.getCompany(),
+                UserType.CUSTOMER
+            );
+
+            if (optCustomer.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            User customer = optCustomer.get();
+
+            return ResponseEntity.ok(new CustomerResponse(customer, provinceRepository, districtRepository));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @PutMapping("/{id}")
     @Transactional
     public ResponseEntity<Object> updateCustomer(
@@ -263,11 +289,23 @@ public class CustomerController {
         @JsonProperty("address")
         public String address;
 
+        @JsonProperty("provinceId")
+        public UUID provinceId;
+
         @JsonProperty("provinceName")
         public String provinceName;
 
+        @JsonProperty("provinceKhmerName")
+        public String provinceKhmerName;
+
+        @JsonProperty("districtId")
+        public UUID districtId;
+
         @JsonProperty("districtName")
         public String districtName;
+
+        @JsonProperty("districtKhmerName")
+        public String districtKhmerName;
 
         @JsonProperty("totalDeliveries")
         public long totalDeliveries;
@@ -281,16 +319,21 @@ public class CustomerController {
             this.name = customer.getDisplayName();
             this.address = customer.getDefaultAddress();
             
-            // Load province and district names
+            // Load province and district details
+            this.provinceId = customer.getDefaultProvinceId();
             if (customer.getDefaultProvinceId() != null) {
-                this.provinceName = provinceRepo.findById(customer.getDefaultProvinceId())
-                    .map(Province::getName)
-                    .orElse(null);
+                provinceRepo.findById(customer.getDefaultProvinceId()).ifPresent(province -> {
+                    this.provinceName = province.getName();
+                    this.provinceKhmerName = province.getNameKh();
+                });
             }
+            
+            this.districtId = customer.getDefaultDistrictId();
             if (customer.getDefaultDistrictId() != null) {
-                this.districtName = districtRepo.findById(customer.getDefaultDistrictId())
-                    .map(District::getName)
-                    .orElse(null);
+                districtRepo.findById(customer.getDefaultDistrictId()).ifPresent(district -> {
+                    this.districtName = district.getName();
+                    this.districtKhmerName = district.getNameKh();
+                });
             }
 
             // Delivery module removed - set defaults
