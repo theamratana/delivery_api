@@ -22,8 +22,10 @@ public class RestExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<?> handleDataIntegrity(DataIntegrityViolationException ex) {
+        String message = ex.getMostSpecificCause().getMessage();
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
-                "error", "constraint_violation"
+                "error", "constraint_violation",
+                "message", message != null ? message : "Database constraint violation"
         ));
     }
 }
