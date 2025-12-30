@@ -12,6 +12,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,9 +20,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.delivery.deliveryapi.model.Company;
-import com.delivery.deliveryapi.model.CompanyCategory;
-import com.delivery.deliveryapi.model.District;
-import com.delivery.deliveryapi.model.Province;
 import com.delivery.deliveryapi.model.User;
 import com.delivery.deliveryapi.model.UserRole;
 import com.delivery.deliveryapi.repo.CompanyCategoryRepository;
@@ -200,6 +198,60 @@ public class CompanyController {
         companyRepository.save(company);
 
         return ResponseEntity.ok(new CompanyBrowseResponse(company, districtRepository, provinceRepository, companyCategoryRepository));
+    }
+
+    @PostMapping
+    @Transactional
+    public ResponseEntity<Object> createCompany(@RequestBody @Valid UpdateCompanyRequest req) {
+        // Get current user
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String userIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID userId;
+        try {
+            userId = UUID.fromString(userIdStr);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        Optional<User> optUser = userRepository.findById(userId);
+        if (optUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User user = optUser.get();
+
+        // Check if user has a company
+        if (user.getCompany() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "User is not part of any company"));
+        }
+
+        // Check if user has appropriate role (OWNER, ADMIN, MANAGER, or STAFF can create partnership companies)
+        if (user.getUserRole() != UserRole.OWNER && 
+            user.getUserRole() != UserRole.SYSTEM_ADMINISTRATOR && 
+            user.getUserRole() != UserRole.MANAGER && 
+            user.getUserRole() != UserRole.STAFF) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", "You do not have permission to create partnership companies"));
+        }
+
+        // Create new company
+        Company company = new Company();
+        company.setName(req.name.trim());
+        company.setAddress(req.address != null ? req.address.trim() : null);
+        company.setPhoneNumber(req.phoneNumber != null ? req.phoneNumber.trim() : null);
+        company.setDistrictId(req.districtId);
+        company.setProvinceId(req.provinceId);
+        company.setCategoryId(req.categoryId);
+        company.setCreatedByCompany(user.getCompany());
+        company.setUpdatedByUser(user);
+        company.setActive(true);
+
+        companyRepository.save(company);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(new CompanyBrowseResponse(company, districtRepository, provinceRepository, companyCategoryRepository));
     }
 
     @PutMapping("/{id}")
