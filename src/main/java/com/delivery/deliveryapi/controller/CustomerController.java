@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.delivery.deliveryapi.model.Company;
 import com.delivery.deliveryapi.model.District;
 import com.delivery.deliveryapi.model.Province;
 import com.delivery.deliveryapi.model.User;
@@ -180,7 +179,9 @@ public class CustomerController {
             // Create new customer
             User customer = new User();
             customer.setPhoneE164(req.phone.trim());
-            customer.setDisplayName(req.name.trim());
+            if (req.name != null && !req.name.trim().isEmpty()) {
+                customer.setDisplayName(req.name.trim());
+            }
             customer.setCompany(currentUser.getCompany());
             customer.setUserType(UserType.CUSTOMER);
             customer.setIncomplete(true);
@@ -237,7 +238,6 @@ public class CustomerController {
         public String phone;
 
         @JsonProperty("name")
-        @NotBlank(message = "Name is required")
         public String name;
 
         @JsonProperty("address")
