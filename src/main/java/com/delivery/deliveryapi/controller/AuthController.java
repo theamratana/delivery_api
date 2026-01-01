@@ -842,7 +842,7 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Successfully left company"));
     }
 
-    public record EmployeeInfo(UUID id, String displayName, String firstName, String lastName, String phoneNumber, UserRole userRole, String status, String invitedAt, String joinedAt) {}
+    public record EmployeeInfo(UUID id, String displayName, String firstName, String lastName, String phoneNumber, String email, String address, UserRole userRole, String status, String invitedAt, String joinedAt, UUID defaultProvinceId, UUID defaultDistrictId) {}
     public record CompanyEmployeesResponse(List<EmployeeInfo> employees, int totalCount) {}
 
     @GetMapping("/companies/{companyId}/employees")
@@ -889,10 +889,14 @@ public class AuthController {
                 emp.getUser().getFirstName(),
                 emp.getUser().getLastName(),
                 emp.getUser().getPhoneE164(),
+                emp.getUser().getEmail(),
+                emp.getUser().getDefaultAddress(),
                 emp.getUserRole(),
                 emp.isActive() ? "ACTIVE" : "INACTIVE",
                 null, // invitedAt not applicable for active employees
-                emp.getCreatedAt() != null ? emp.getCreatedAt().toString() : null
+                emp.getCreatedAt() != null ? emp.getCreatedAt().toString() : null,
+                emp.getUser().getDefaultProvinceId(),
+                emp.getUser().getDefaultDistrictId()
             ));
         }
 
@@ -904,10 +908,14 @@ public class AuthController {
                 null, // no first name
                 null, // no last name
                 pendingEmployee.getPhoneE164(),
+                pendingEmployee.getEmail(),
+                pendingEmployee.getAddress(),
                 pendingEmployee.getRole(),
                 "PENDING",
                 pendingEmployee.getCreatedAt() != null ? pendingEmployee.getCreatedAt().toString() : null,
-                null // joinedAt not applicable for pending employees
+                null, // joinedAt not applicable for pending employees
+                pendingEmployee.getDefaultProvinceId(),
+                pendingEmployee.getDefaultDistrictId()
             ));
         }
 
