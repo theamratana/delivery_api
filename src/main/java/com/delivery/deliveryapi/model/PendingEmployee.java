@@ -27,6 +27,27 @@ public class PendingEmployee {
     @Column(nullable = false, length = 32)
     private UserRole role;
 
+    @Column(length = 100)
+    private String firstName;
+
+    @Column(length = 100)
+    private String lastName;
+
+    @Column(length = 200)
+    private String displayName;
+
+    @Column(length = 255)
+    private String email;
+
+    @Column(length = 500)
+    private String address;
+
+    @Column
+    private UUID defaultProvinceId;
+
+    @Column
+    private UUID defaultDistrictId;
+
     @Column(nullable = false)
     private Instant expiresAt;
 
@@ -61,6 +82,27 @@ public class PendingEmployee {
 
     public UserRole getRole() { return role; }
     public void setRole(UserRole role) { this.role = role; }
+
+    public String getFirstName() { return firstName; }
+    public void setFirstName(String firstName) { this.firstName = firstName; }
+
+    public String getLastName() { return lastName; }
+    public void setLastName(String lastName) { this.lastName = lastName; }
+
+    public String getDisplayName() { return displayName; }
+    public void setDisplayName(String displayName) { this.displayName = displayName; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
+
+    public UUID getDefaultProvinceId() { return defaultProvinceId; }
+    public void setDefaultProvinceId(UUID defaultProvinceId) { this.defaultProvinceId = defaultProvinceId; }
+
+    public UUID getDefaultDistrictId() { return defaultDistrictId; }
+    public void setDefaultDistrictId(UUID defaultDistrictId) { this.defaultDistrictId = defaultDistrictId; }
 
     public Instant getExpiresAt() { return expiresAt; }
     public void setExpiresAt(Instant expiresAt) { this.expiresAt = expiresAt; }

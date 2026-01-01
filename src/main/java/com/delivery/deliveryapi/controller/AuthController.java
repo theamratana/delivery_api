@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -626,7 +627,7 @@ public class AuthController {
             canAssign = true;
         } else if (user.getUserRole() == UserRole.MANAGER) {
             // Managers can add STAFF and DRIVER roles
-            if (req.role == UserRole.STAFF || req.role == UserRole.DRIVER) {
+            if (req.userRole == UserRole.STAFF || req.userRole == UserRole.DRIVER) {
                 canAssign = true;
             } else {
                 errorMessage = "Managers can only add staff and driver employees";
@@ -645,13 +646,117 @@ public class AuthController {
                     .body(Map.of("error", "An employee invitation already exists for this phone number"));
         }
 
+        // Get the company
+        Optional<Company> companyOpt = companyRepository.findById(companyId);
+        if (companyOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Company not found"));
+        }
+        Company company = companyOpt.get();
+
         // Check if phone number already belongs to an existing user
         Optional<User> existingUser = userRepository.findByPhoneE164(req.phoneNumber);
         if (existingUser.isPresent()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", "This phone number is already registered to another user"));
+            User existingUserObj = existingUser.get();
+            
+            // Check if user already has an employee record in THIS company
+            Optional<Employee> existingEmployee = employeeRepository.findByUserIdAndCompanyId(existingUserObj.getId(), companyId);
+            if (existingEmployee.isPresent()) {
+                Employee emp = existingEmployee.get();
+                if (emp.isActive()) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "This user is already an active employee in your company"));
+                } else {
+                    // Reactivate the existing employee record
+                    emp.setActive(true);
+                    emp.setUserRole(req.userRole);
+                    employeeRepository.save(emp);
+                    
+                    // Update user details
+                    existingUserObj.setUserRole(req.userRole);
+                    existingUserObj.setCompany(company);
+                    if (req.firstName != null) existingUserObj.setFirstName(req.firstName);
+                    if (req.lastName != null) existingUserObj.setLastName(req.lastName);
+                    if (req.displayName != null) existingUserObj.setDisplayName(req.displayName);
+                    if (req.email != null) existingUserObj.setEmail(req.email);
+                    userRepository.save(existingUserObj);
+                    
+                    return ResponseEntity.ok(Map.of(
+                        "message", "Employee reactivated successfully",
+                        "userId", existingUserObj.getId(),
+                        "phoneNumber", req.phoneNumber,
+                        "userRole", req.userRole
+                    ));
+                }
+            } else {
+                // User exists but not in this company - check if they're in another company
+                if (existingUserObj.getCompany() != null && !existingUserObj.getCompany().getId().equals(companyId)) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "This user is already employed by another company"));
+                }
+                
+                // User exists but no employee record - create employee record directly
+                existingUserObj.setCompany(company);
+                existingUserObj.setUserRole(req.userRole);
+                existingUserObj.setUserType(UserType.COMPANY);
+                if (req.firstName != null) existingUserObj.setFirstName(req.firstName);
+                if (req.lastName != null) existingUserObj.setLastName(req.lastName);
+                if (req.displayName != null) existingUserObj.setDisplayName(req.displayName);
+                if (req.email != null) existingUserObj.setEmail(req.email);
+                userRepository.save(existingUserObj);
+                
+                Employee newEmployee = new Employee(existingUserObj, company, req.userRole);
+                employeeRepository.save(newEmployee);
+                
+                return ResponseEntity.ok(Map.of(
+                    "message", "Employee added successfully (user already existed)",
+                    "userId", existingUserObj.getId(),
+                    "phoneNumber", req.phoneNumber,
+                    "userRole", req.userRole
+                ));
+            }
         }
 
+        // For DRIVER role, create user immediately without pending invitation
+        if (req.userRole == UserRole.DRIVER) {
+            try {
+                // Create user directly
+                User newUser = new User();
+                newUser.setPhoneE164(req.phoneNumber);
+                newUser.setUsername("u_" + req.phoneNumber);
+                newUser.setCompany(company);
+                newUser.setUserRole(req.userRole);
+                newUser.setUserType(UserType.COMPANY);
+                newUser.setActive(true);
+                newUser.setIncomplete(true); // Mark as incomplete until they verify phone
+                
+                if (req.firstName != null) newUser.setFirstName(req.firstName);
+                if (req.lastName != null) newUser.setLastName(req.lastName);
+                if (req.displayName != null) newUser.setDisplayName(req.displayName);
+                if (req.email != null) newUser.setEmail(req.email);
+                if (req.address != null) newUser.setDefaultAddress(req.address);
+                if (req.defaultProvinceId != null) newUser.setDefaultProvinceId(req.defaultProvinceId);
+                if (req.defaultDistrictId != null) newUser.setDefaultDistrictId(req.defaultDistrictId);
+                
+                newUser = userRepository.save(newUser);
+                
+                // Create employee record
+                Employee employee = new Employee(newUser, company, req.userRole);
+                employeeRepository.save(employee);
+                
+                return ResponseEntity.ok(Map.of(
+                    "message", "Driver created successfully (can be assigned to deliveries immediately)",
+                    "userId", newUser.getId(),
+                    "phoneNumber", req.phoneNumber,
+                    "userRole", req.userRole,
+                    "note", "Driver can verify phone later to access the app"
+                ));
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("error", "Failed to create driver: " + e.getMessage()));
+            }
+        }
+
+        // For other roles (STAFF, MANAGER, etc.), use pending invitation flow
         // Check if phone number has active pending invitations in any company
         Optional<PendingEmployee> activePending = pendingEmployeeRepository.findActiveByPhone(req.phoneNumber, java.time.Instant.now());
         if (activePending.isPresent()) {
@@ -660,18 +765,18 @@ public class AuthController {
         }
 
         try {
-            // Get the company
-            Optional<Company> companyOpt = companyRepository.findById(companyId);
-            if (companyOpt.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Company not found"));
-            }
-            Company company = companyOpt.get();
-
-            // Create pending employee record
+            // Create pending employee record for new user
             PendingEmployee pendingEmployee = new PendingEmployee();
             pendingEmployee.setPhoneE164(req.phoneNumber);
             pendingEmployee.setCompany(company);
-            pendingEmployee.setRole(req.role);
+            pendingEmployee.setRole(req.userRole);
+            pendingEmployee.setFirstName(req.firstName);
+            pendingEmployee.setLastName(req.lastName);
+            pendingEmployee.setDisplayName(req.displayName);
+            pendingEmployee.setEmail(req.email);
+            pendingEmployee.setAddress(req.address);
+            pendingEmployee.setDefaultProvinceId(req.defaultProvinceId);
+            pendingEmployee.setDefaultDistrictId(req.defaultDistrictId);
             pendingEmployee.setExpiresAt(java.time.Instant.now().plusSeconds(7L * 24 * 60 * 60)); // 7 days
 
             pendingEmployeeRepository.save(pendingEmployee);
@@ -679,7 +784,7 @@ public class AuthController {
             return ResponseEntity.ok(Map.of(
                 "message", "Employee invitation created successfully",
                 "phoneNumber", pendingEmployee.getPhoneE164(),
-                "role", pendingEmployee.getRole(),
+                "userRole", pendingEmployee.getRole(),
                 "expiresAt", pendingEmployee.getExpiresAt()
             ));
         } catch (Exception e) {
@@ -688,7 +793,17 @@ public class AuthController {
         }
     }
 
-    public record AddEmployeeRequest(UserRole role, String phoneNumber) {}
+    public record AddEmployeeRequest(
+        UserRole userRole,
+        String phoneNumber,
+        String firstName,
+        String lastName,
+        String displayName,
+        String email,
+        String address,
+        UUID defaultProvinceId,
+        UUID defaultDistrictId
+    ) {}
 
     @PostMapping("/leave-company")
     @Transactional
@@ -727,7 +842,7 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Successfully left company"));
     }
 
-    public record EmployeeInfo(UUID id, String displayName, String firstName, String lastName, String phoneNumber, UserRole role, String status, String invitedAt, String joinedAt) {}
+    public record EmployeeInfo(UUID id, String displayName, String firstName, String lastName, String phoneNumber, UserRole userRole, String status, String invitedAt, String joinedAt) {}
     public record CompanyEmployeesResponse(List<EmployeeInfo> employees, int totalCount) {}
 
     @GetMapping("/companies/{companyId}/employees")
@@ -757,8 +872,8 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Only owners and managers can view employees"));
         }
 
-        // Get active employees
-        List<Employee> activeEmployees = employeeRepository.findByCompanyIdAndActive(companyId, true);
+        // Get all employees (active and inactive)
+        List<Employee> allEmployees = employeeRepository.findByCompanyId(companyId);
 
         // Get pending employees
         var pendingEmployees = pendingEmployeeRepository.findByCompanyIdAndExpiresAtAfter(companyId, java.time.Instant.now());
@@ -766,8 +881,8 @@ public class AuthController {
         // Combine into response
         List<EmployeeInfo> employeeInfos = new java.util.ArrayList<>();
 
-        // Add active employees
-        for (Employee emp : activeEmployees) {
+        // Add all employees with their status
+        for (Employee emp : allEmployees) {
             employeeInfos.add(new EmployeeInfo(
                 emp.getUser().getId(),
                 emp.getUser().getDisplayName(),
@@ -775,7 +890,7 @@ public class AuthController {
                 emp.getUser().getLastName(),
                 emp.getUser().getPhoneE164(),
                 emp.getUserRole(),
-                "ACTIVE",
+                emp.isActive() ? "ACTIVE" : "INACTIVE",
                 null, // invitedAt not applicable for active employees
                 emp.getCreatedAt() != null ? emp.getCreatedAt().toString() : null
             ));
@@ -797,6 +912,370 @@ public class AuthController {
         }
 
         return ResponseEntity.ok(new CompanyEmployeesResponse(employeeInfos, employeeInfos.size()));
+    }
+
+    @PutMapping("/companies/{companyId}/employees/{userId}/deactivate")
+    @Transactional
+    public ResponseEntity<Object> deactivateEmployee(@PathVariable UUID companyId, @PathVariable UUID userId) {
+        // Check if current user has permission
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String currentUserIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID currentUserId = UUID.fromString(currentUserIdStr);
+        Optional<User> optCurrentUser = userRepository.findById(currentUserId);
+        if (optCurrentUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User currentUser = optCurrentUser.get();
+
+        log.info("Deactivate request - Current user: {}, role: {}, companyId: {}, target userId: {}", 
+            currentUserId, currentUser.getUserRole(), 
+            currentUser.getCompany() != null ? currentUser.getCompany().getId() : "null", userId);
+
+        // Check company membership
+        if (currentUser.getCompany() == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", "You are not a member of any company", "details", "Your company is null"));
+        }
+        if (!currentUser.getCompany().getId().equals(companyId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", "You must be a member of this company", 
+                    "yourCompanyId", currentUser.getCompany().getId().toString(),
+                    "requestedCompanyId", companyId.toString()));
+        }
+
+        // Get the employee record
+        Optional<Employee> optEmployee = employeeRepository.findByUserIdAndCompanyId(userId, companyId);
+        if (optEmployee.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", "Employee not found", 
+                    "details", "No employee record found for userId=" + userId + " in companyId=" + companyId));
+        }
+        Employee employee = optEmployee.get();
+
+        // Check permissions
+        boolean canDeactivate = false;
+        String errorMessage = "Insufficient permissions to deactivate employee";
+
+        if (currentUser.getUserRole() == UserRole.OWNER) {
+            // Owners can deactivate any employee except themselves
+            if (currentUserId.equals(userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "You cannot deactivate yourself", 
+                        "yourUserId", currentUserId.toString()));
+            }
+            canDeactivate = true;
+        } else if (currentUser.getUserRole() == UserRole.MANAGER) {
+            // Managers can deactivate STAFF and DRIVER roles only
+            if (employee.getUserRole() == UserRole.STAFF || employee.getUserRole() == UserRole.DRIVER) {
+                canDeactivate = true;
+            } else {
+                errorMessage = "Managers can only deactivate staff and driver employees";
+            }
+        } else {
+            errorMessage = "Only owners and managers can deactivate employees";
+        }
+
+        if (!canDeactivate) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", errorMessage, 
+                    "yourRole", currentUser.getUserRole().toString(),
+                    "targetRole", employee.getUserRole().toString()));
+        }
+
+        // Deactivate the employee
+        employee.setActive(false);
+        employeeRepository.save(employee);
+
+        log.info("Employee deactivated successfully - userId: {}, companyId: {}", userId, companyId);
+        return ResponseEntity.ok(Map.of("message", "Employee deactivated successfully"));
+    }
+
+    @PutMapping("/companies/{companyId}/employees/{userId}/activate")
+    @Transactional
+    public ResponseEntity<Object> activateEmployee(@PathVariable UUID companyId, @PathVariable UUID userId) {
+        // Check if current user has permission
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String currentUserIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID currentUserId = UUID.fromString(currentUserIdStr);
+        Optional<User> optCurrentUser = userRepository.findById(currentUserId);
+        if (optCurrentUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User currentUser = optCurrentUser.get();
+
+        // Check company membership
+        if (currentUser.getCompany() == null || !currentUser.getCompany().getId().equals(companyId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "You must be a member of this company"));
+        }
+
+        // Get the employee record
+        Optional<Employee> optEmployee = employeeRepository.findByUserIdAndCompanyId(userId, companyId);
+        if (optEmployee.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Employee not found"));
+        }
+        Employee employee = optEmployee.get();
+
+        // Check permissions
+        boolean canActivate = false;
+        String errorMessage = "Insufficient permissions to activate employee";
+
+        if (currentUser.getUserRole() == UserRole.OWNER) {
+            canActivate = true;
+        } else if (currentUser.getUserRole() == UserRole.MANAGER) {
+            // Managers can activate STAFF and DRIVER roles only
+            if (employee.getUserRole() == UserRole.STAFF || employee.getUserRole() == UserRole.DRIVER) {
+                canActivate = true;
+            } else {
+                errorMessage = "Managers can only activate staff and driver employees";
+            }
+        } else {
+            errorMessage = "Only owners and managers can activate employees";
+        }
+
+        if (!canActivate) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", errorMessage));
+        }
+
+        // Activate the employee
+        employee.setActive(true);
+        employeeRepository.save(employee);
+
+        return ResponseEntity.ok(Map.of("message", "Employee activated successfully"));
+    }
+
+    @DeleteMapping("/companies/{companyId}/employees/{userId}")
+    @Transactional
+    public ResponseEntity<Object> deleteEmployee(@PathVariable UUID companyId, @PathVariable UUID userId) {
+        // Check if current user has permission
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String currentUserIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID currentUserId = UUID.fromString(currentUserIdStr);
+        Optional<User> optCurrentUser = userRepository.findById(currentUserId);
+        if (optCurrentUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User currentUser = optCurrentUser.get();
+
+        // Check company membership
+        if (currentUser.getCompany() == null || !currentUser.getCompany().getId().equals(companyId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "You must be a member of this company"));
+        }
+
+        // Only OWNER can delete employees
+        if (currentUser.getUserRole() != UserRole.OWNER) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", "Only company owners can permanently delete employees"));
+        }
+
+        // Prevent owner from deleting themselves
+        if (currentUserId.equals(userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", "You cannot delete yourself"));
+        }
+
+        // Get the employee record
+        Optional<Employee> optEmployee = employeeRepository.findByUserIdAndCompanyId(userId, companyId);
+        if (optEmployee.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Employee not found"));
+        }
+
+        // Delete the employee record
+        employeeRepository.delete(optEmployee.get());
+
+        return ResponseEntity.ok(Map.of("message", "Employee deleted successfully"));
+    }
+
+    public record UpdateEmployeeRequest(
+        UserRole userRole,
+        String firstName,
+        String lastName,
+        String displayName,
+        String email,
+        String phoneNumber,
+        String address,
+        UUID defaultProvinceId,
+        UUID defaultDistrictId
+    ) {}
+
+    @PutMapping("/companies/{companyId}/employees/{userId}")
+    @Transactional
+    public ResponseEntity<Object> updateEmployee(@PathVariable UUID companyId, @PathVariable UUID userId, @RequestBody UpdateEmployeeRequest req) {
+        // Check if current user has permission
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String currentUserIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID currentUserId = UUID.fromString(currentUserIdStr);
+        Optional<User> optCurrentUser = userRepository.findById(currentUserId);
+        if (optCurrentUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User currentUser = optCurrentUser.get();
+
+        // Check company membership
+        if (currentUser.getCompany() == null || !currentUser.getCompany().getId().equals(companyId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "You must be a member of this company"));
+        }
+
+        // Get the employee record
+        Optional<Employee> optEmployee = employeeRepository.findByUserIdAndCompanyId(userId, companyId);
+        if (optEmployee.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Employee not found"));
+        }
+        Employee employee = optEmployee.get();
+        User employeeUser = employee.getUser();
+
+        // Check permissions
+        boolean canUpdate = false;
+        String errorMessage = "Insufficient permissions to update employee";
+
+        if (currentUser.getUserRole() == UserRole.OWNER) {
+            canUpdate = true;
+        } else if (currentUser.getUserRole() == UserRole.MANAGER) {
+            // Managers can update STAFF and DRIVER roles only
+            if (employee.getUserRole() == UserRole.STAFF || employee.getUserRole() == UserRole.DRIVER) {
+                canUpdate = true;
+            } else {
+                errorMessage = "Managers can only update staff and driver employees";
+            }
+        } else {
+            errorMessage = "Only owners and managers can update employees";
+        }
+
+        if (!canUpdate) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", errorMessage));
+        }
+
+        // Update user fields
+        boolean updated = false;
+        
+        if (req.firstName != null && !req.firstName.equals(employeeUser.getFirstName())) {
+            employeeUser.setFirstName(req.firstName);
+            updated = true;
+        }
+        if (req.lastName != null && !req.lastName.equals(employeeUser.getLastName())) {
+            employeeUser.setLastName(req.lastName);
+            updated = true;
+        }
+        if (req.displayName != null && !req.displayName.equals(employeeUser.getDisplayName())) {
+            employeeUser.setDisplayName(req.displayName);
+            updated = true;
+        }
+        if (req.email != null && !req.email.equals(employeeUser.getEmail())) {
+            // Check if email is already used by another user (only if not empty)
+            if (!req.email.trim().isEmpty()) {
+                // Email uniqueness will be validated by database constraint
+                // If it fails, DataIntegrityViolationException will be thrown
+            }
+            employeeUser.setEmail(req.email.trim().isEmpty() ? null : req.email);
+            updated = true;
+        }
+        if (req.phoneNumber != null && !req.phoneNumber.equals(employeeUser.getPhoneE164())) {
+            // Check if phone is already used by another user
+            if (!req.phoneNumber.trim().isEmpty()) {
+                Optional<User> existingPhone = userRepository.findByPhoneE164(req.phoneNumber);
+                if (existingPhone.isPresent() && !existingPhone.get().getId().equals(userId)) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "Phone number is already used by another user"));
+                }
+            }
+            employeeUser.setPhoneE164(req.phoneNumber.trim().isEmpty() ? null : req.phoneNumber);
+            if (!req.phoneNumber.trim().isEmpty()) {
+                employeeUser.setUsername("u_" + req.phoneNumber); // Update username to match phone
+            }
+            updated = true;
+        }
+        if (req.address != null && !req.address.equals(employeeUser.getDefaultAddress())) {
+            employeeUser.setDefaultAddress(req.address.trim().isEmpty() ? null : req.address);
+            updated = true;
+        }
+        if (req.defaultProvinceId != null && !req.defaultProvinceId.equals(employeeUser.getDefaultProvinceId())) {
+            employeeUser.setDefaultProvinceId(req.defaultProvinceId);
+            updated = true;
+        }
+        if (req.defaultDistrictId != null && !req.defaultDistrictId.equals(employeeUser.getDefaultDistrictId())) {
+            employeeUser.setDefaultDistrictId(req.defaultDistrictId);
+            updated = true;
+        }
+
+        // Update role if changed
+        if (req.userRole != null && req.userRole != employee.getUserRole()) {
+            // Check if user has permission to assign the new role
+            if (currentUser.getUserRole() == UserRole.MANAGER) {
+                if (req.userRole != UserRole.STAFF && req.userRole != UserRole.DRIVER) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Managers can only assign STAFF and DRIVER roles"));
+                }
+            }
+            employee.setUserRole(req.userRole);
+            employeeUser.setUserRole(req.userRole);
+            employeeRepository.save(employee);
+            updated = true;
+        }
+
+        if (updated) {
+            userRepository.save(employeeUser);
+            return ResponseEntity.ok(Map.of("message", "Employee updated successfully"));
+        } else {
+            return ResponseEntity.ok(Map.of("message", "No changes made"));
+        }
+    }
+
+    @DeleteMapping("/companies/{companyId}/pending-employees/{phoneNumber}")
+    @Transactional
+    public ResponseEntity<Object> cancelPendingInvitation(@PathVariable UUID companyId, @PathVariable String phoneNumber) {
+        // Check if current user has permission
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof String currentUserIdStr)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        UUID currentUserId = UUID.fromString(currentUserIdStr);
+        Optional<User> optCurrentUser = userRepository.findById(currentUserId);
+        if (optCurrentUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User currentUser = optCurrentUser.get();
+
+        // Check company membership
+        if (currentUser.getCompany() == null || !currentUser.getCompany().getId().equals(companyId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "You must be a member of this company"));
+        }
+
+        // Check permissions - only OWNER and MANAGER can cancel invitations
+        if (currentUser.getUserRole() != UserRole.OWNER && currentUser.getUserRole() != UserRole.MANAGER) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", "Only owners and managers can cancel pending invitations"));
+        }
+
+        // Find the pending employee
+        Optional<com.delivery.deliveryapi.model.PendingEmployee> optPending = 
+            pendingEmployeeRepository.findByPhoneE164AndCompanyId(phoneNumber, companyId);
+        
+        if (optPending.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", "Pending invitation not found"));
+        }
+
+        com.delivery.deliveryapi.model.PendingEmployee pendingEmployee = optPending.get();
+
+        // Managers can only cancel STAFF and DRIVER invitations
+        if (currentUser.getUserRole() == UserRole.MANAGER) {
+            if (pendingEmployee.getRole() != UserRole.STAFF && pendingEmployee.getRole() != UserRole.DRIVER) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Managers can only cancel staff and driver invitations"));
+            }
+        }
+
+        // Delete the pending invitation
+        pendingEmployeeRepository.delete(pendingEmployee);
+
+        return ResponseEntity.ok(Map.of("message", "Pending invitation canceled successfully"));
     }
 
     public record LoginRequest(String username, String password) {}

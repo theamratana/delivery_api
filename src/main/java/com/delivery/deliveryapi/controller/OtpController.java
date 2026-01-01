@@ -26,6 +26,7 @@ import jakarta.validation.constraints.NotBlank;
 @RequestMapping("/auth/otp")
 @Validated
 public class OtpController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OtpController.class);
     private final OtpService otpService;
     private final TelegramBotClient tg;
     private final JwtService jwtService;
@@ -65,11 +66,14 @@ public class OtpController {
             }
             return ResponseEntity.ok(new OtpVerifyResponse(token, u.getId(), displayName, u.getUsername(), "TELEGRAM-OTP"));
         } catch (DataIntegrityViolationException e) {
+            log.error("DataIntegrityViolationException during OTP verification", e);
+            String message = e.getMessage() != null ? e.getMessage() : "Unknown constraint violation";
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(Map.of("error", "Phone number already registered or constraint violation"));
+                .body(Map.of("error", "Phone number already registered or constraint violation", "details", message));
         } catch (Exception e) {
+            log.error("Exception during OTP verification", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Verification failed"));
+                .body(Map.of("error", "Verification failed", "details", e.getMessage()));
         }
     }
 }

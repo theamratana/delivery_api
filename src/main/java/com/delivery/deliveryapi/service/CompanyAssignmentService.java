@@ -7,8 +7,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.deliveryapi.model.Employee;
 import com.delivery.deliveryapi.model.User;
+import com.delivery.deliveryapi.model.UserType;
+import com.delivery.deliveryapi.repo.DistrictRepository;
 import com.delivery.deliveryapi.repo.EmployeeRepository;
 import com.delivery.deliveryapi.repo.PendingEmployeeRepository;
+import com.delivery.deliveryapi.repo.ProvinceRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
 
 @Service
@@ -17,13 +20,19 @@ public class CompanyAssignmentService {
     private final PendingEmployeeRepository pendingEmployeeRepository;
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
+    private final ProvinceRepository provinceRepository;
+    private final DistrictRepository districtRepository;
 
     public CompanyAssignmentService(PendingEmployeeRepository pendingEmployeeRepository,
                                    UserRepository userRepository,
-                                   EmployeeRepository employeeRepository) {
+                                   EmployeeRepository employeeRepository,
+                                   ProvinceRepository provinceRepository,
+                                   DistrictRepository districtRepository) {
         this.pendingEmployeeRepository = pendingEmployeeRepository;
         this.userRepository = userRepository;
         this.employeeRepository = employeeRepository;
+        this.provinceRepository = provinceRepository;
+        this.districtRepository = districtRepository;
     }
 
     /**
@@ -44,6 +53,34 @@ public class CompanyAssignmentService {
                 // Assign user to company
                 user.setCompany(pendingEmployee.getCompany());
                 user.setUserRole(pendingEmployee.getRole());
+                user.setUserType(UserType.COMPANY);
+                
+                // Apply profile information from pending employee
+                if (pendingEmployee.getFirstName() != null) {
+                    user.setFirstName(pendingEmployee.getFirstName());
+                }
+                if (pendingEmployee.getLastName() != null) {
+                    user.setLastName(pendingEmployee.getLastName());
+                }
+                if (pendingEmployee.getDisplayName() != null) {
+                    user.setDisplayName(pendingEmployee.getDisplayName());
+                }
+                if (pendingEmployee.getEmail() != null) {
+                    user.setEmail(pendingEmployee.getEmail());
+                }
+                if (pendingEmployee.getAddress() != null) {
+                    user.setDefaultAddress(pendingEmployee.getAddress());
+                }
+                // Validate province/district IDs exist before assigning (foreign key constraint)
+                if (pendingEmployee.getDefaultProvinceId() != null 
+                    && provinceRepository.existsById(pendingEmployee.getDefaultProvinceId())) {
+                    user.setDefaultProvinceId(pendingEmployee.getDefaultProvinceId());
+                }
+                if (pendingEmployee.getDefaultDistrictId() != null 
+                    && districtRepository.existsById(pendingEmployee.getDefaultDistrictId())) {
+                    user.setDefaultDistrictId(pendingEmployee.getDefaultDistrictId());
+                }
+                
                 user.setIncomplete(false);
                 userRepository.save(user);
 
