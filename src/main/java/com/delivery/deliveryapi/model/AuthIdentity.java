@@ -5,7 +5,9 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import lombok.Data;
 
+@Data
 @Entity
 @Table(name = "auth_identities", uniqueConstraints = {
         @UniqueConstraint(name = "uk_provider_user", columnNames = {"provider", "provider_user_id"})
@@ -41,21 +43,4 @@ public class AuthIdentity {
 
     @Column(name = "last_login_at")
     private OffsetDateTime lastLoginAt;
-
-    public UUID getId() { return id; }
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
-    public AuthProvider getProvider() { return provider; }
-    public void setProvider(AuthProvider provider) { this.provider = provider; }
-    public String getProviderUserId() { return providerUserId; }
-    public void setProviderUserId(String providerUserId) { this.providerUserId = providerUserId; }
-    public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
-    public String getDisplayName() { return displayName; }
-    public void setDisplayName(String displayName) { this.displayName = displayName; }
-    public String getPasswordHash() { return passwordHash; }
-    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public OffsetDateTime getLastLoginAt() { return lastLoginAt; }
-    public void setLastLoginAt(OffsetDateTime lastLoginAt) { this.lastLoginAt = lastLoginAt; }
 }

@@ -9,7 +9,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 
+@Data
+@EqualsAndHashCode(callSuper = true)
 @Entity
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Table(name = "provinces",
@@ -93,61 +97,6 @@ public class Province extends AuditableEntity {
         this.nameKh = nameKh;
         this.capital = capital;
     }
-
-    // Getters and setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-
-    public String getCode() { return code; }
-    public void setCode(String code) { this.code = code; }
-
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-
-    public String getNameKh() { return nameKh; }
-    public void setNameKh(String nameKh) { this.nameKh = nameKh; }
-
-    public String getCapital() { return capital; }
-    public void setCapital(String capital) { this.capital = capital; }
-
-    public Integer getAreaKm2() { return areaKm2; }
-    public void setAreaKm2(Integer areaKm2) { this.areaKm2 = areaKm2; }
-
-    public Integer getPopulation() { return population; }
-    public void setPopulation(Integer population) { this.population = population; }
-
-    public Integer getDistrictsKrong() { return districtsKrong; }
-    public void setDistrictsKrong(Integer districtsKrong) { this.districtsKrong = districtsKrong; }
-
-    public Integer getDistrictsSrok() { return districtsSrok; }
-    public void setDistrictsSrok(Integer districtsSrok) { this.districtsSrok = districtsSrok; }
-
-    public Integer getDistrictsKhan() { return districtsKhan; }
-    public void setDistrictsKhan(Integer districtsKhan) { this.districtsKhan = districtsKhan; }
-
-    public Integer getTotalDistricts() { return totalDistricts; }
-    public void setTotalDistricts(Integer totalDistricts) { this.totalDistricts = totalDistricts; }
-
-    public Integer getCommunesCommune() { return communesCommune; }
-    public void setCommunesCommune(Integer communesCommune) { this.communesCommune = communesCommune; }
-
-    public Integer getCommunesSangkat() { return communesSangkat; }
-    public void setCommunesSangkat(Integer communesSangkat) { this.communesSangkat = communesSangkat; }
-
-    public Integer getTotalCommunes() { return totalCommunes; }
-    public void setTotalCommunes(Integer totalCommunes) { this.totalCommunes = totalCommunes; }
-
-    public Integer getTotalVillages() { return totalVillages; }
-    public void setTotalVillages(Integer totalVillages) { this.totalVillages = totalVillages; }
-
-    public String getReferenceNumber() { return referenceNumber; }
-    public void setReferenceNumber(String referenceNumber) { this.referenceNumber = referenceNumber; }
-
-    public Integer getReferenceYear() { return referenceYear; }
-    public void setReferenceYear(Integer referenceYear) { this.referenceYear = referenceYear; }
-
-    public boolean isActive() { return active; }
-    public void setActive(boolean active) { this.active = active; }
 
     // Utility methods
     public void updateTotalDistricts() {

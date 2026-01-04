@@ -5,7 +5,9 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import lombok.Data;
 
+@Data
 @Entity
 @Table(name = "user_audits",
     indexes = {
@@ -36,18 +38,4 @@ public class UserAudit {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
-
-    // Getters and setters
-    public UUID getId() { return id; }
-    public UUID getUserId() { return userId; }
-    public void setUserId(UUID userId) { this.userId = userId; }
-    public String getFieldName() { return fieldName; }
-    public void setFieldName(String fieldName) { this.fieldName = fieldName; }
-    public String getOldValue() { return oldValue; }
-    public void setOldValue(String oldValue) { this.oldValue = oldValue; }
-    public String getNewValue() { return newValue; }
-    public void setNewValue(String newValue) { this.newValue = newValue; }
-    public String getSource() { return source; }
-    public void setSource(String source) { this.source = source; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
 }

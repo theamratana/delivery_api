@@ -19,7 +19,9 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import lombok.Data;
 
+@Data
 @Entity
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Table(name = "companies",
@@ -83,34 +85,6 @@ public class Company {
     public Company(String name) {
         this.name = name;
     }
-
-    public UUID getId() { return id; }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    public String getAddress() { return address; }
-    public void setAddress(String address) { this.address = address; }
-    public UUID getDistrictId() { return districtId; }
-    public void setDistrictId(UUID districtId) { this.districtId = districtId; }
-    public UUID getProvinceId() { return provinceId; }
-    public void setProvinceId(UUID provinceId) { this.provinceId = provinceId; }
-    public UUID getCategoryId() { return categoryId; }
-    public void setCategoryId(UUID categoryId) { this.categoryId = categoryId; }
-    public boolean isActive() { return active; }
-    public void setActive(boolean active) { this.active = active; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
-
-    public String getPhoneNumber() { return phoneNumber; }
-    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
-
-    public User getCreatedByUser() { return createdByUser; }
-    public void setCreatedByUser(User createdByUser) { this.createdByUser = createdByUser; }
-
-    public User getUpdatedByUser() { return updatedByUser; }
-    public void setUpdatedByUser(User updatedByUser) { this.updatedByUser = updatedByUser; }
-
-    public Company getCreatedByCompany() { return createdByCompany; }
-    public void setCreatedByCompany(Company createdByCompany) { this.createdByCompany = createdByCompany; }
 
     @PrePersist
     @PreUpdate

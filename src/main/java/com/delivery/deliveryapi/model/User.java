@@ -19,7 +19,9 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 import jakarta.persistence.UniqueConstraint;
+import lombok.Data;
 
+@Data
 @Entity
 @Table(name = "users",
     uniqueConstraints = {
@@ -101,46 +103,6 @@ public class User {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
-
-    public UUID getId() { return id; }
-    public String getDisplayName() { return displayName; }
-    public void setDisplayName(String displayName) { this.displayName = displayName; }
-    public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
-    public String getFirstName() { return firstName; }
-    public void setFirstName(String firstName) { this.firstName = firstName; }
-    public String getLastName() { return lastName; }
-    public void setLastName(String lastName) { this.lastName = lastName; }
-    public String getAvatarUrl() { return avatarUrl; }
-    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
-    public String getPhoneE164() { return phoneE164; }
-    public void setPhoneE164(String phoneE164) { this.phoneE164 = phoneE164; }
-    public OffsetDateTime getPhoneVerifiedAt() { return phoneVerifiedAt; }
-    public void setPhoneVerifiedAt(OffsetDateTime phoneVerifiedAt) { this.phoneVerifiedAt = phoneVerifiedAt; }
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-    public OffsetDateTime getEmailVerifiedAt() { return emailVerifiedAt; }
-    public void setEmailVerifiedAt(OffsetDateTime emailVerifiedAt) { this.emailVerifiedAt = emailVerifiedAt; }
-    public UserType getUserType() { return userType; }
-    public void setUserType(UserType userType) { this.userType = userType; }
-    public Company getCompany() { return company; }
-    public void setCompany(Company company) { this.company = company; }
-    public String getDefaultAddress() { return defaultAddress; }
-    public void setDefaultAddress(String defaultAddress) { this.defaultAddress = defaultAddress; }
-    public UUID getDefaultProvinceId() { return defaultProvinceId; }
-    public void setDefaultProvinceId(UUID defaultProvinceId) { this.defaultProvinceId = defaultProvinceId; }
-    public UUID getDefaultDistrictId() { return defaultDistrictId; }
-    public void setDefaultDistrictId(UUID defaultDistrictId) { this.defaultDistrictId = defaultDistrictId; }
-    public UserRole getUserRole() { return userRole; }
-    public void setUserRole(UserRole userRole) { this.userRole = userRole; }
-    public boolean isIncomplete() { return incomplete; }
-    public void setIncomplete(boolean incomplete) { this.incomplete = incomplete; }
-    public boolean isActive() { return active; }
-    public void setActive(boolean active) { this.active = active; }
-    public OffsetDateTime getLastLoginAt() { return lastLoginAt; }
-    public void setLastLoginAt(OffsetDateTime lastLoginAt) { this.lastLoginAt = lastLoginAt; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
 
     @Transient
     public String getFullName() {

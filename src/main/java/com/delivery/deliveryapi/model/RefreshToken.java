@@ -5,7 +5,9 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import lombok.Data;
 
+@Data
 @Entity
 @Table(name = "refresh_tokens", indexes = {
         @Index(name = "idx_refresh_token", columnList = "token_hash"),
@@ -35,17 +37,4 @@ public class RefreshToken {
 
     @Column(name = "ip_address")
     private String ipAddress;
-
-    public String getId() { return id; }
-    public String getTokenHash() { return tokenHash; }
-    public void setTokenHash(String tokenHash) { this.tokenHash = tokenHash; }
-    public UUID getUserId() { return userId; }
-    public void setUserId(UUID userId) { this.userId = userId; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public OffsetDateTime getExpiresAt() { return expiresAt; }
-    public void setExpiresAt(OffsetDateTime expiresAt) { this.expiresAt = expiresAt; }
-    public String getDeviceInfo() { return deviceInfo; }
-    public void setDeviceInfo(String deviceInfo) { this.deviceInfo = deviceInfo; }
-    public String getIpAddress() { return ipAddress; }
-    public void setIpAddress(String ipAddress) { this.ipAddress = ipAddress; }
 }

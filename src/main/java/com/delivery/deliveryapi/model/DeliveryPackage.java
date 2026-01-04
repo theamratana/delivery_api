@@ -6,7 +6,11 @@ import java.util.List;
 import java.util.UUID;
 
 import jakarta.persistence.*;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 
+@Data
+@EqualsAndHashCode(callSuper = true)
 @Entity
 @Table(name = "delivery_packages")
 public class DeliveryPackage extends AuditableEntity {
@@ -159,134 +163,4 @@ public class DeliveryPackage extends AuditableEntity {
 
     // Constructors
     public DeliveryPackage() {}
-
-    // Getters and Setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-
-    public User getSender() { return sender; }
-    public void setSender(User sender) { this.sender = sender; }
-
-    public String getSenderName() { return senderName; }
-    public void setSenderName(String senderName) { this.senderName = senderName; }
-
-    public String getSenderPhone() { return senderPhone; }
-    public void setSenderPhone(String senderPhone) { this.senderPhone = senderPhone; }
-
-    public User getReceiver() { return receiver; }
-    public void setReceiver(User receiver) { this.receiver = receiver; }
-
-    public String getReceiverName() { return receiverName; }
-    public void setReceiverName(String receiverName) { this.receiverName = receiverName; }
-
-    public String getReceiverPhone() { return receiverPhone; }
-    public void setReceiverPhone(String receiverPhone) { this.receiverPhone = receiverPhone; }
-
-    public Company getDeliveryCompany() { return deliveryCompany; }
-    public void setDeliveryCompany(Company deliveryCompany) { this.deliveryCompany = deliveryCompany; }
-
-    public User getDeliveryDriver() { return deliveryDriver; }
-    public void setDeliveryDriver(User deliveryDriver) { this.deliveryDriver = deliveryDriver; }
-
-    public String getPickupAddress() { return pickupAddress; }
-    public void setPickupAddress(String pickupAddress) { this.pickupAddress = pickupAddress; }
-
-    public String getPickupProvince() { return pickupProvince; }
-    public void setPickupProvince(String pickupProvince) { this.pickupProvince = pickupProvince; }
-
-    public String getPickupDistrict() { return pickupDistrict; }
-    public void setPickupDistrict(String pickupDistrict) { this.pickupDistrict = pickupDistrict; }
-
-    public BigDecimal getPickupLat() { return pickupLat; }
-    public void setPickupLat(BigDecimal pickupLat) { this.pickupLat = pickupLat; }
-
-    public BigDecimal getPickupLng() { return pickupLng; }
-    public void setPickupLng(BigDecimal pickupLng) { this.pickupLng = pickupLng; }
-
-    public String getDeliveryAddress() { return deliveryAddress; }
-    public void setDeliveryAddress(String deliveryAddress) { this.deliveryAddress = deliveryAddress; }
-
-    public String getDeliveryProvince() { return deliveryProvince; }
-    public void setDeliveryProvince(String deliveryProvince) { this.deliveryProvince = deliveryProvince; }
-
-    public String getDeliveryDistrict() { return deliveryDistrict; }
-    public void setDeliveryDistrict(String deliveryDistrict) { this.deliveryDistrict = deliveryDistrict; }
-
-    public BigDecimal getDeliveryLat() { return deliveryLat; }
-    public void setDeliveryLat(BigDecimal deliveryLat) { this.deliveryLat = deliveryLat; }
-
-    public BigDecimal getDeliveryLng() { return deliveryLng; }
-    public void setDeliveryLng(BigDecimal deliveryLng) { this.deliveryLng = deliveryLng; }
-
-    public BigDecimal getDeliveryFee() { return deliveryFee; }
-    public void setDeliveryFee(BigDecimal deliveryFee) { this.deliveryFee = deliveryFee; }
-
-    public BigDecimal getDeliveryDiscount() { return deliveryDiscount; }
-    public void setDeliveryDiscount(BigDecimal deliveryDiscount) { this.deliveryDiscount = deliveryDiscount; }
-
-    public BigDecimal getOrderDiscount() { return orderDiscount; }
-    public void setOrderDiscount(BigDecimal orderDiscount) { this.orderDiscount = orderDiscount; }
-
-    public BigDecimal getActualDeliveryCost() { return actualDeliveryCost; }
-    public void setActualDeliveryCost(BigDecimal actualDeliveryCost) { this.actualDeliveryCost = actualDeliveryCost; }
-
-    public String getCurrency() { return currency; }
-    public void setCurrency(String currency) { this.currency = currency; }
-
-    public BigDecimal getExchangeRateUsed() { return exchangeRateUsed; }
-    public void setExchangeRateUsed(BigDecimal exchangeRateUsed) { this.exchangeRateUsed = exchangeRateUsed; }
-
-    public BigDecimal getKhrAmount() { return khrAmount; }
-    public void setKhrAmount(BigDecimal khrAmount) { this.khrAmount = khrAmount; }
-
-    public BigDecimal getSubTotal() { return subTotal; }
-    public void setSubTotal(BigDecimal subTotal) { this.subTotal = subTotal; }
-
-    public BigDecimal getGrandTotal() { return grandTotal; }
-    public void setGrandTotal(BigDecimal grandTotal) { this.grandTotal = grandTotal; }
-
-    public PaymentMethod getPaymentMethod() { return paymentMethod; }
-    public void setPaymentMethod(PaymentMethod paymentMethod) { this.paymentMethod = paymentMethod; }
-
-    public OffsetDateTime getEstimatedDeliveryTime() { return estimatedDeliveryTime; }
-    public void setEstimatedDeliveryTime(OffsetDateTime estimatedDeliveryTime) { this.estimatedDeliveryTime = estimatedDeliveryTime; }
-
-    public DeliveryStatus getStatus() { return status; }
-    public void setStatus(DeliveryStatus status) { this.status = status; }
-
-    public String getLastStatusNote() { return lastStatusNote; }
-    public void setLastStatusNote(String lastStatusNote) { this.lastStatusNote = lastStatusNote; }
-
-    public String getSpecialInstructions() { return specialInstructions; }
-    public void setSpecialInstructions(String specialInstructions) { this.specialInstructions = specialInstructions; }
-
-    public String getNotes() { return notes; }
-    public void setNotes(String notes) { this.notes = notes; }
-
-    public Boolean getAutoCreatedCompany() { return autoCreatedCompany; }
-    public void setAutoCreatedCompany(Boolean autoCreatedCompany) { this.autoCreatedCompany = autoCreatedCompany; }
-
-    public Boolean getAutoCreatedDriver() { return autoCreatedDriver; }
-    public void setAutoCreatedDriver(Boolean autoCreatedDriver) { this.autoCreatedDriver = autoCreatedDriver; }
-
-    public Boolean getAutoCreatedReceiver() { return autoCreatedReceiver; }
-    public void setAutoCreatedReceiver(Boolean autoCreatedReceiver) { this.autoCreatedReceiver = autoCreatedReceiver; }
-
-    public Boolean getFeeAutoCalculated() { return feeAutoCalculated; }
-    public void setFeeAutoCalculated(Boolean feeAutoCalculated) { this.feeAutoCalculated = feeAutoCalculated; }
-
-    public Boolean getDeleted() { return deleted; }
-    public void setDeleted(Boolean deleted) { this.deleted = deleted; }
-
-    public OffsetDateTime getDeletedAt() { return deletedAt; }
-    public void setDeletedAt(OffsetDateTime deletedAt) { this.deletedAt = deletedAt; }
-
-    public List<DeliveryItem> getItems() { return items; }
-    public void setItems(List<DeliveryItem> items) { this.items = items; }
-
-    public List<DeliveryPackagePhoto> getPhotos() { return photos; }
-    public void setPhotos(List<DeliveryPackagePhoto> photos) { this.photos = photos; }
-
-    public List<DeliveryTracking> getTrackingHistory() { return trackingHistory; }
-    public void setTrackingHistory(List<DeliveryTracking> trackingHistory) { this.trackingHistory = trackingHistory; }
 }

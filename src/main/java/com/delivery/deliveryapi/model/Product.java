@@ -19,7 +19,11 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 
+@Data
+@EqualsAndHashCode(callSuper = true)
 @Entity
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Table(name = "products",
@@ -81,41 +85,4 @@ public class Product extends AuditableEntity {
         this.name = name;
         this.description = description;
     }
-
-    // Getters and setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-
-    public Company getCompany() { return company; }
-    public void setCompany(Company company) { this.company = company; }
-
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-
-    public ProductCategory getCategory() { return category; }
-    public void setCategory(ProductCategory category) { this.category = category; }
-
-    public BigDecimal getBuyingPrice() { return buyingPrice; }
-    public void setBuyingPrice(BigDecimal buyingPrice) { this.buyingPrice = buyingPrice; }
-
-    public BigDecimal getSellingPrice() { return sellingPrice; }
-    public void setSellingPrice(BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
-
-    public BigDecimal getFullPrice() { return fullPrice; }
-    public void setFullPrice(BigDecimal fullPrice) { this.fullPrice = fullPrice; }
-
-    public String getAttributes() { return attributes; }
-    public void setAttributes(String attributes) { this.attributes = attributes; }
-
-    public List<ProductPhoto> getProductPhotos() { return productPhotos; }
-    public void setProductPhotos(List<ProductPhoto> productPhotos) { this.productPhotos = productPhotos; }
-
-    public Boolean getIsActive() { return isActive; }
-    public void setIsActive(Boolean isActive) { this.isActive = isActive; }
-
-    public Boolean getIsPublished() { return isPublished; }
-    public void setIsPublished(Boolean isPublished) { this.isPublished = isPublished; }
 }

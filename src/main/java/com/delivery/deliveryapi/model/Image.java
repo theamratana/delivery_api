@@ -11,7 +11,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.Data;
 
+@Data
 @Entity
 @Table(name = "images")
 public class Image {
@@ -34,14 +36,4 @@ public class Image {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
-
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-    public String getUrl() { return url; }
-    public void setUrl(String url) { this.url = url; }
-    public User getUploader() { return uploader; }
-    public void setUploader(User uploader) { this.uploader = uploader; }
-    public Company getCompany() { return company; }
-    public void setCompany(Company company) { this.company = company; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
 }

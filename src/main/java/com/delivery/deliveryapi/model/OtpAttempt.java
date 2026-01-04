@@ -1,9 +1,11 @@
 package com.delivery.deliveryapi.model;
 
 import jakarta.persistence.*;
+import lombok.Data;
 import java.time.Instant;
 import java.util.UUID;
 
+@Data
 @Entity
 @Table(name = "otp_attempts", indexes = {
         @Index(name = "idx_otp_link_code", columnList = "linkCode", unique = true),
@@ -58,38 +60,4 @@ public class OtpAttempt {
     public void preUpdate() {
         updatedAt = Instant.now();
     }
-
-    // Getters and setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-
-    public String getPhoneE164() { return phoneE164; }
-    public void setPhoneE164(String phoneE164) { this.phoneE164 = phoneE164; }
-
-    public OtpStatus getStatus() { return status; }
-    public void setStatus(OtpStatus status) { this.status = status; }
-
-    public String getLinkCode() { return linkCode; }
-    public void setLinkCode(String linkCode) { this.linkCode = linkCode; }
-
-    public Long getChatId() { return chatId; }
-    public void setChatId(Long chatId) { this.chatId = chatId; }
-
-    public String getCodeHash() { return codeHash; }
-    public void setCodeHash(String codeHash) { this.codeHash = codeHash; }
-
-    public int getTriesCount() { return triesCount; }
-    public void setTriesCount(int triesCount) { this.triesCount = triesCount; }
-
-    public int getMaxTries() { return maxTries; }
-    public void setMaxTries(int maxTries) { this.maxTries = maxTries; }
-
-    public Instant getExpiresAt() { return expiresAt; }
-    public void setExpiresAt(Instant expiresAt) { this.expiresAt = expiresAt; }
-
-    public Instant getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
-
-    public Instant getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
 }

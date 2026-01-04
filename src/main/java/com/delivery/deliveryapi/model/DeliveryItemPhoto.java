@@ -4,7 +4,9 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.*;
+import lombok.Data;
 
+@Data
 @Entity
 @Table(name = "delivery_item_photos")
 public class DeliveryItemPhoto {
@@ -40,28 +42,6 @@ public class DeliveryItemPhoto {
         this.photoUrl = photoUrl;
         this.sequenceOrder = sequenceOrder;
     }
-
-    // Getters and Setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-
-    public DeliveryItem getDeliveryItem() { return deliveryItem; }
-    public void setDeliveryItem(DeliveryItem deliveryItem) { this.deliveryItem = deliveryItem; }
-
-    public String getPhotoUrl() { return photoUrl; }
-    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
-
-    public Integer getSequenceOrder() { return sequenceOrder; }
-    public void setSequenceOrder(Integer sequenceOrder) { this.sequenceOrder = sequenceOrder; }
-
-    public Boolean getDeleted() { return deleted; }
-    public void setDeleted(Boolean deleted) { this.deleted = deleted; }
-
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
-
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
 
     @PreUpdate
     public void preUpdate() {

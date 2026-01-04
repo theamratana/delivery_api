@@ -9,7 +9,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.Data;
 
+@Data
 @Entity
 @Table(name = "product_photos")
 public class ProductPhoto {
@@ -36,17 +38,4 @@ public class ProductPhoto {
         this.photoUrl = photoUrl;
         this.photoIndex = photoIndex;
     }
-
-    // Getters and setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-
-    public Product getProduct() { return product; }
-    public void setProduct(Product product) { this.product = product; }
-
-    public Integer getPhotoIndex() { return photoIndex; }
-    public void setPhotoIndex(Integer photoIndex) { this.photoIndex = photoIndex; }
-
-    public String getPhotoUrl() { return photoUrl; }
-    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
 }

@@ -6,7 +6,9 @@ import java.util.List;
 import java.util.UUID;
 
 import jakarta.persistence.*;
+import lombok.Data;
 
+@Data
 @Entity
 @Table(name = "delivery_items")
 public class DeliveryItem {
@@ -57,46 +59,6 @@ public class DeliveryItem {
 
     // Constructors
     public DeliveryItem() {}
-
-    // Getters and Setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-
-    public DeliveryPackage getDeliveryPackage() { return deliveryPackage; }
-    public void setDeliveryPackage(DeliveryPackage deliveryPackage) { this.deliveryPackage = deliveryPackage; }
-
-    public Product getProduct() { return product; }
-    public void setProduct(Product product) { this.product = product; }
-
-    public String getItemDescription() { return itemDescription; }
-    public void setItemDescription(String itemDescription) { this.itemDescription = itemDescription; }
-
-    public Integer getQuantity() { return quantity; }
-    public void setQuantity(Integer quantity) { this.quantity = quantity; }
-
-    public BigDecimal getItemValue() { return itemValue; }
-    public void setItemValue(BigDecimal itemValue) { this.itemValue = itemValue; }
-
-    public BigDecimal getItemDiscount() { return itemDiscount; }
-    public void setItemDiscount(BigDecimal itemDiscount) { this.itemDiscount = itemDiscount; }
-
-    public Integer getSequenceOrder() { return sequenceOrder; }
-    public void setSequenceOrder(Integer sequenceOrder) { this.sequenceOrder = sequenceOrder; }
-
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
-
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
-
-    public Boolean getDeleted() { return deleted; }
-    public void setDeleted(Boolean deleted) { this.deleted = deleted; }
-
-    public OffsetDateTime getDeletedAt() { return deletedAt; }
-    public void setDeletedAt(OffsetDateTime deletedAt) { this.deletedAt = deletedAt; }
-
-    public List<DeliveryItemPhoto> getPhotos() { return photos; }
-    public void setPhotos(List<DeliveryItemPhoto> photos) { this.photos = photos; }
 
     @PreUpdate
     public void preUpdate() {

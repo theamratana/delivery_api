@@ -18,7 +18,9 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import lombok.Data;
 
+@Data
 @Entity
 @Table(name = "employees",
     uniqueConstraints = {
@@ -80,26 +82,6 @@ public class Employee {
         // Initialize with current user data for sync
         syncFromUser();
     }
-
-    public UUID getId() { return id; }
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
-    public Company getCompany() { return company; }
-    public void setCompany(Company company) { this.company = company; }
-    public UserRole getUserRole() { return userRole; }
-    public void setUserRole(UserRole userRole) { this.userRole = userRole; }
-    public String getDisplayName() { return displayName; }
-    public void setDisplayName(String displayName) { this.displayName = displayName; }
-    public String getFirstName() { return firstName; }
-    public void setFirstName(String firstName) { this.firstName = firstName; }
-    public String getLastName() { return lastName; }
-    public void setLastName(String lastName) { this.lastName = lastName; }
-    public String getPhoneE164() { return phoneE164; }
-    public void setPhoneE164(String phoneE164) { this.phoneE164 = phoneE164; }
-    public boolean isActive() { return active; }
-    public void setActive(boolean active) { this.active = active; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
 
     /**
      * Sync profile data from the associated user

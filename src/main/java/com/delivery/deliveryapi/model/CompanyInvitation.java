@@ -1,8 +1,10 @@
 package com.delivery.deliveryapi.model;
 
 import jakarta.persistence.*;
+import lombok.Data;
 import java.time.LocalDateTime;
 
+@Data
 @Entity
 @Table(name = "company_invitations")
 public class CompanyInvitation {
@@ -50,26 +52,4 @@ public class CompanyInvitation {
         this.phoneNumber = phoneNumber;
         this.createdAt = LocalDateTime.now();
     }
-
-    // Getters and Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
-    public Company getCompany() { return company; }
-    public void setCompany(Company company) { this.company = company; }
-
-    public UserRole getRole() { return role; }
-    public void setRole(UserRole role) { this.role = role; }
-
-    public LocalDateTime getExpiresAt() { return expiresAt; }
-    public void setExpiresAt(LocalDateTime expiresAt) { this.expiresAt = expiresAt; }
-
-    public String getInvitationCode() { return invitationCode; }
-    public void setInvitationCode(String invitationCode) { this.invitationCode = invitationCode; }
-
-    public String getPhoneNumber() { return phoneNumber; }
-    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
-
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

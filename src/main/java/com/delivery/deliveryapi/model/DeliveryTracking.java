@@ -5,7 +5,9 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.*;
+import lombok.Data;
 
+@Data
 @Entity
 @Table(name = "delivery_tracking")
 public class DeliveryTracking {
@@ -56,38 +58,4 @@ public class DeliveryTracking {
         this.description = description;
         this.timestamp = OffsetDateTime.now();
     }
-
-    // Getters and Setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-
-    public DeliveryPackage getDeliveryPackage() { return deliveryPackage; }
-    public void setDeliveryPackage(DeliveryPackage deliveryPackage) { this.deliveryPackage = deliveryPackage; }
-
-    public DeliveryStatus getStatus() { return status; }
-    public void setStatus(DeliveryStatus status) { this.status = status; }
-
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-
-    public OffsetDateTime getTimestamp() { return timestamp; }
-    public void setTimestamp(OffsetDateTime timestamp) { this.timestamp = timestamp; }
-
-    public String getLocation() { return location; }
-    public void setLocation(String location) { this.location = location; }
-
-    public BigDecimal getLatitude() { return latitude; }
-    public void setLatitude(BigDecimal latitude) { this.latitude = latitude; }
-
-    public BigDecimal getLongitude() { return longitude; }
-    public void setLongitude(BigDecimal longitude) { this.longitude = longitude; }
-
-    public User getUpdatedBy() { return updatedBy; }
-    public void setUpdatedBy(User updatedBy) { this.updatedBy = updatedBy; }
-
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
-
-    public Boolean getDeleted() { return deleted; }
-    public void setDeleted(Boolean deleted) { this.deleted = deleted; }
 }

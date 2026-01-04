@@ -7,7 +7,9 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import lombok.Data;
 
+@Data
 @Entity
 @Table(name = "user_phones",
         uniqueConstraints = {
@@ -45,18 +47,6 @@ public class UserPhone {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
-
-    public UUID getId() { return id; }
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
-    public String getPhoneE164() { return phoneE164; }
-    public void setPhoneE164(String phoneE164) { this.phoneE164 = phoneE164; }
-    public boolean isPrimary() { return primary; }
-    public void setPrimary(boolean primary) { this.primary = primary; }
-    public OffsetDateTime getVerifiedAt() { return verifiedAt; }
-    public void setVerifiedAt(OffsetDateTime verifiedAt) { this.verifiedAt = verifiedAt; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
 
     @PrePersist
     @PreUpdate

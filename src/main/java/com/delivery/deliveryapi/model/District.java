@@ -12,7 +12,11 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 
+@Data
+@EqualsAndHashCode(callSuper = true)
 @Entity
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Table(name = "districts",
@@ -89,50 +93,4 @@ public class District extends AuditableEntity {
         this.code = code;
         this.province = province;
     }
-
-    // Getters and setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-
-    public String getNameKh() { return nameKh; }
-    public void setNameKh(String nameKh) { this.nameKh = nameKh; }
-
-    public String getCode() { return code; }
-    public void setCode(String code) { this.code = code; }
-
-    public Province getProvince() { return province; }
-    public void setProvince(Province province) { this.province = province; }
-
-    public String getType() { return type; }
-    public void setType(String type) { this.type = type; }
-
-    public Integer getAreaKm2() { return areaKm2; }
-    public void setAreaKm2(Integer areaKm2) { this.areaKm2 = areaKm2; }
-
-    public Integer getPopulation() { return population; }
-    public void setPopulation(Integer population) { this.population = population; }
-
-    public String getPostalCode() { return postalCode; }
-    public void setPostalCode(String postalCode) { this.postalCode = postalCode; }
-
-    public Integer getCommunesCommune() { return communesCommune; }
-    public void setCommunesCommune(Integer communesCommune) { this.communesCommune = communesCommune; }
-
-    public Integer getCommunesSangkat() { return communesSangkat; }
-    public void setCommunesSangkat(Integer communesSangkat) { this.communesSangkat = communesSangkat; }
-
-    public Integer getTotalVillages() { return totalVillages; }
-    public void setTotalVillages(Integer totalVillages) { this.totalVillages = totalVillages; }
-
-    public String getReferenceNumber() { return referenceNumber; }
-    public void setReferenceNumber(String referenceNumber) { this.referenceNumber = referenceNumber; }
-
-    public Integer getReferenceYear() { return referenceYear; }
-    public void setReferenceYear(Integer referenceYear) { this.referenceYear = referenceYear; }
-
-    public boolean isActive() { return active; }
-    public void setActive(boolean active) { this.active = active; }
 }

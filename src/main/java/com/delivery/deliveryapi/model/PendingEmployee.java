@@ -1,9 +1,11 @@
 package com.delivery.deliveryapi.model;
 
 import jakarta.persistence.*;
+import lombok.Data;
 import java.time.Instant;
 import java.util.UUID;
 
+@Data
 @Entity
 @Table(name = "pending_employees", indexes = {
         @Index(name = "idx_pending_phone_company", columnList = "phoneE164, companyId", unique = true),
@@ -69,47 +71,4 @@ public class PendingEmployee {
     public void preUpdate() {
         updatedAt = Instant.now();
     }
-
-    // Getters and setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-
-    public String getPhoneE164() { return phoneE164; }
-    public void setPhoneE164(String phoneE164) { this.phoneE164 = phoneE164; }
-
-    public Company getCompany() { return company; }
-    public void setCompany(Company company) { this.company = company; }
-
-    public UserRole getRole() { return role; }
-    public void setRole(UserRole role) { this.role = role; }
-
-    public String getFirstName() { return firstName; }
-    public void setFirstName(String firstName) { this.firstName = firstName; }
-
-    public String getLastName() { return lastName; }
-    public void setLastName(String lastName) { this.lastName = lastName; }
-
-    public String getDisplayName() { return displayName; }
-    public void setDisplayName(String displayName) { this.displayName = displayName; }
-
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-
-    public String getAddress() { return address; }
-    public void setAddress(String address) { this.address = address; }
-
-    public UUID getDefaultProvinceId() { return defaultProvinceId; }
-    public void setDefaultProvinceId(UUID defaultProvinceId) { this.defaultProvinceId = defaultProvinceId; }
-
-    public UUID getDefaultDistrictId() { return defaultDistrictId; }
-    public void setDefaultDistrictId(UUID defaultDistrictId) { this.defaultDistrictId = defaultDistrictId; }
-
-    public Instant getExpiresAt() { return expiresAt; }
-    public void setExpiresAt(Instant expiresAt) { this.expiresAt = expiresAt; }
-
-    public Instant getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
-
-    public Instant getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
 }
