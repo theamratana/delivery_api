@@ -22,6 +22,15 @@
 
 - [x] Implement Interactive Reset Menu (added numbered options 0-5 for module selection instead of code editing)
 
+## Project-Specific Configuration
+- **Database**: Using Docker for PostgreSQL with container name `delivery-postgres`
+  - Access via: `docker exec -it delivery-postgres psql -U postgres -d deliverydb`
+  - Configured in docker-compose.yml
+  
+- **Lombok**: Project uses Lombok annotations - **DO NOT create getter/setter methods manually**
+  - Use `@Data`, `@Getter`, `@Setter` annotations instead
+  - Getters/setters are auto-generated at compile time
+
 ## Terminal Commands Best Practice
 - **Always add a space at the beginning of terminal commands** to prevent the first character from being lost during command execution. This is a known issue with the terminal.
   - Example: ` cd /path/to/dir` instead of `cd /path/to/dir`
