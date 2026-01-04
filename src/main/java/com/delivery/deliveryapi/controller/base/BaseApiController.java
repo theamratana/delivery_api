@@ -76,7 +76,7 @@ public abstract class BaseApiController<T> {
                 page = service.query(companyId, filters, pageable);
             }
             
-            return ResponseEntity.ok(page);
+            return ResponseEntity.ok(new PageResponse<>(page));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", e.getMessage()));
@@ -251,5 +251,39 @@ public abstract class BaseApiController<T> {
             // If no 'id' field or reflection fails, ignore
             // The service layer will handle validation
         }
+    }
+
+    /**
+     * Custom page response wrapper to use "records" instead of "content"
+     */
+    public static class PageResponse<T> {
+        private final java.util.List<T> records;
+        private final int page;
+        private final int size;
+        private final long totalElements;
+        private final int totalPages;
+        private final boolean first;
+        private final boolean last;
+        private final boolean empty;
+
+        public PageResponse(Page<T> page) {
+            this.records = page.getContent();
+            this.page = page.getNumber();
+            this.size = page.getSize();
+            this.totalElements = page.getTotalElements();
+            this.totalPages = page.getTotalPages();
+            this.first = page.isFirst();
+            this.last = page.isLast();
+            this.empty = page.isEmpty();
+        }
+
+        public java.util.List<T> getRecords() { return records; }
+        public int getPage() { return page; }
+        public int getSize() { return size; }
+        public long getTotalElements() { return totalElements; }
+        public int getTotalPages() { return totalPages; }
+        public boolean isFirst() { return first; }
+        public boolean isLast() { return last; }
+        public boolean isEmpty() { return empty; }
     }
 }

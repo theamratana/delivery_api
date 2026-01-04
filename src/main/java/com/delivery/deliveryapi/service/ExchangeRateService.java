@@ -8,21 +8,19 @@ import org.springframework.stereotype.Service;
 
 import com.delivery.deliveryapi.model.ExchangeRate;
 import com.delivery.deliveryapi.repo.ExchangeRateRepository;
+import com.delivery.deliveryapi.service.base.BaseServiceImpl;
 
 @Service
-public class ExchangeRateService {
+public class ExchangeRateService extends BaseServiceImpl<ExchangeRate, ExchangeRateRepository> {
 
     private static final BigDecimal DEFAULT_USD_TO_KHR = new BigDecimal("4000.0000");
-    
-    private final ExchangeRateRepository exchangeRateRepository;
 
-    public ExchangeRateService(ExchangeRateRepository exchangeRateRepository) {
-        this.exchangeRateRepository = exchangeRateRepository;
+    public ExchangeRateService(ExchangeRateRepository repository) {
+        super(repository);
     }
 
     /**
      * Get the current exchange rate for a company.
-     * Falls back to global rate if company has no specific rate.
      * Defaults to 4000 for USD->KHR if no rate is configured.
      */
     public BigDecimal getExchangeRateForCompany(String fromCurrency, String toCurrency, UUID companyId) {
@@ -31,30 +29,9 @@ public class ExchangeRateService {
 
     /**
      * Get the exchange rate for a company as of a specific date/time.
-     * Falls back to global rate if company has no specific rate.
      */
     public BigDecimal getExchangeRateForCompanyAsOf(String fromCurrency, String toCurrency, UUID companyId, OffsetDateTime asOfDate) {
-        if (companyId == null) {
-            return getExchangeRateAsOf(fromCurrency, toCurrency, asOfDate);
-        }
-        return exchangeRateRepository.findLatestRateForCompany(fromCurrency, toCurrency, companyId, asOfDate)
-            .map(ExchangeRate::getRate)
-            .orElseGet(() -> getDefaultRate(fromCurrency, toCurrency));
-    }
-
-    /**
-     * Get the current exchange rate between two currencies (global rate only).
-     * Defaults to 4000 for USD->KHR if no rate is configured.
-     */
-    public BigDecimal getExchangeRate(String fromCurrency, String toCurrency) {
-        return getExchangeRateAsOf(fromCurrency, toCurrency, OffsetDateTime.now());
-    }
-
-    /**
-     * Get the exchange rate as of a specific date/time (global rate only).
-     */
-    public BigDecimal getExchangeRateAsOf(String fromCurrency, String toCurrency, OffsetDateTime asOfDate) {
-        return exchangeRateRepository.findLatestRate(fromCurrency, toCurrency, asOfDate)
+        return repository.findLatestRateForCompany(fromCurrency, toCurrency, companyId, asOfDate)
             .map(ExchangeRate::getRate)
             .orElseGet(() -> getDefaultRate(fromCurrency, toCurrency));
     }
@@ -78,17 +55,6 @@ public class ExchangeRateService {
             return null;
         }
         BigDecimal rate = getExchangeRateForCompany(fromCurrency, toCurrency, companyId);
-        return amount.multiply(rate);
-    }
-
-    /**
-     * Convert an amount from one currency to another (using global rate).
-     */
-    public BigDecimal convert(BigDecimal amount, String fromCurrency, String toCurrency) {
-        if (amount == null) {
-            return null;
-        }
-        BigDecimal rate = getExchangeRate(fromCurrency, toCurrency);
         return amount.multiply(rate);
     }
 }

@@ -6,18 +6,19 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 /**
  * Exchange rate for currency conversion.
- * Can be company-specific or system-wide (company_id = null).
+ * Company-specific exchange rates tracked via TenantAuditableEntity.
  * Default: 1 USD = 4000 KHR
  */
+@Data
+@EqualsAndHashCode(callSuper = true)
 @Entity
 @Table(name = "exchange_rates",
     indexes = {
@@ -25,7 +26,7 @@ import jakarta.persistence.Table;
         @Index(name = "idx_exchange_rates_from_to", columnList = "from_currency, to_currency")
     }
 )
-public class ExchangeRate extends AuditableEntity {
+public class ExchangeRate extends TenantAuditableEntity {
 
     @Id
     @Column(name = "id", nullable = false, updatable = false)
@@ -49,32 +50,4 @@ public class ExchangeRate extends AuditableEntity {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "company_id")
-    private Company company;
-
-    // Getters and setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-
-    public String getFromCurrency() { return fromCurrency; }
-    public void setFromCurrency(String fromCurrency) { this.fromCurrency = fromCurrency; }
-
-    public String getToCurrency() { return toCurrency; }
-    public void setToCurrency(String toCurrency) { this.toCurrency = toCurrency; }
-
-    public BigDecimal getRate() { return rate; }
-    public void setRate(BigDecimal rate) { this.rate = rate; }
-
-    public OffsetDateTime getEffectiveDate() { return effectiveDate; }
-    public void setEffectiveDate(OffsetDateTime effectiveDate) { this.effectiveDate = effectiveDate; }
-
-    public Boolean getIsActive() { return isActive; }
-    public void setIsActive(Boolean isActive) { this.isActive = isActive; }
-
-    public String getNotes() { return notes; }
-    public void setNotes(String notes) { this.notes = notes; }
-
-    public Company getCompany() { return company; }
-    public void setCompany(Company company) { this.company = company; }
 }
