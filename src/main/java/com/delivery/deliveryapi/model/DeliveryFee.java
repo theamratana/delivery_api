@@ -53,15 +53,11 @@ import lombok.NoArgsConstructor;
                columnList = "company_id, target_company_id")
     }
 )
-public class DeliveryFee extends AuditableEntity {
+public class DeliveryFee extends TenantAuditableEntity {
     
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id = UUID.randomUUID();
-    
-    // The company that created/manages this fee configuration
-    @Column(name = "company_id", nullable = false)
-    private UUID companyId;
     
     // The company this fee applies to (can be same as company or a partner)
     @Column(name = "target_company_id", nullable = false)
