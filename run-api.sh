@@ -229,7 +229,41 @@ case "$cmd" in
 			echo $! > .pid_api
 		fi
 		PID=$(cat .pid_api)
-		echo "✅ API server started (PID: ${PID}). Logs -> .api.log"
-		echo "   Access at: http://localhost:${SERVER_PORT}/api/"
+		
+		# Wait and verify the API actually started
+		echo "⏳ Waiting for API to start..."
+		WAIT_TIME=0
+		MAX_WAIT=30
+		while [ $WAIT_TIME -lt $MAX_WAIT ]; do
+			sleep 1
+			WAIT_TIME=$((WAIT_TIME + 1))
+			REMAINING=$((MAX_WAIT - WAIT_TIME))
+			
+			# Check if process is still alive
+			if ! kill -0 "$PID" 2>/dev/null; then
+				echo ""
+				echo "❌ BUILD FAILED - Process died. Check .api.log for errors:"
+				tail -20 .api.log | grep -E "error:|ERROR|FAILED|BUILD FAILED" || tail -10 .api.log
+				rm -f .pid_api
+				exit 1
+			fi
+			
+			# Check if port is listening
+			if port_in_use "$SERVER_PORT"; then
+				echo ""
+				echo "✅ API server running (PID: ${PID})"
+				echo "   Access at: http://localhost:${SERVER_PORT}/api/"
+				exit 0
+			fi
+			
+			# Show countdown
+			printf "\r   Waiting... %ds elapsed (%ds remaining)   " "$WAIT_TIME" "$REMAINING"
+		done
+		
+		# Timeout reached
+		echo ""
+		echo "⚠️  Timeout: API didn't start within ${MAX_WAIT}s. Check .api.log for details:"
+		tail -20 .api.log
+		exit 1
 		;;
 esac
