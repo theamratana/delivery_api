@@ -1,10 +1,8 @@
 package com.delivery.deliveryapi.repo;
 
-import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -13,7 +11,33 @@ import org.springframework.data.repository.query.Param;
 import com.delivery.deliveryapi.model.DeliveryFee;
 
 public interface DeliveryFeeRepository extends JpaRepository<DeliveryFee, UUID>, JpaSpecificationExecutor<DeliveryFee> {
-    
+
+    /**
+     * Hierarchical fee lookup with fallback:
+     * 1. Exact district match
+     * 2. Province-wide (district = null)
+     * 3. Global default (province = null, district = null)
+     */
+    @Query("SELECT df FROM DeliveryFee df WHERE df.targetCompanyId = :targetCompanyId " +
+           "AND df.provinceId = :provinceId AND df.districtId = :districtId " +
+           "AND df.active = true AND df.deleted = false")
+    Optional<DeliveryFee> findFeeByDistrict(
+        @Param("targetCompanyId") UUID targetCompanyId,
+        @Param("provinceId") UUID provinceId,
+        @Param("districtId") UUID districtId);
+
+    @Query("SELECT df FROM DeliveryFee df WHERE df.targetCompanyId = :targetCompanyId " +
+           "AND df.provinceId = :provinceId AND df.districtId IS NULL " +
+           "AND df.active = true AND df.deleted = false")
+    Optional<DeliveryFee> findFeeByProvince(
+        @Param("targetCompanyId") UUID targetCompanyId,
+        @Param("provinceId") UUID provinceId);
+
+    @Query("SELECT df FROM DeliveryFee df WHERE df.targetCompanyId = :targetCompanyId " +
+           "AND df.provinceId IS NULL AND df.districtId IS NULL " +
+           "AND df.active = true AND df.deleted = false")
+    Optional<DeliveryFee> findDefaultFee(@Param("targetCompanyId") UUID targetCompanyId);
+
     // /**
     //  * Find all delivery fees managed by a company
     //  */
