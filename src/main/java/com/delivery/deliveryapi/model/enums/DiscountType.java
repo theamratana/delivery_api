@@ -5,10 +5,11 @@ import lombok.Getter;
 /**
  * Discount type enum with multi-language support.
  * Defines how discount is calculated.
- * If discount_type is NULL, it means no discount is applied.
+ * Use NONE to indicate no discount is applied.
  */
 @Getter
 public enum DiscountType {
+    NONE("None", "គ្មាន"),
     AMOUNT("Fixed Amount", "ចំនួនថេរ"),
     PERCENTAGE("Percentage", "ភាគរយ");
 
