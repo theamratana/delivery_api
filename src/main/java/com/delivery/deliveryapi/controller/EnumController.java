@@ -24,7 +24,7 @@ import com.delivery.deliveryapi.model.enums.PaymentType;
  * No authentication required - public reference data.
  */
 @RestController
-@RequestMapping("/api/enums")
+@RequestMapping("/enums")
 public class EnumController {
 
     @GetMapping("/order-types")
