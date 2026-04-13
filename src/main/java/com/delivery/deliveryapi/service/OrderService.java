@@ -5,7 +5,11 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -250,6 +254,44 @@ public class OrderService extends BaseServiceImpl<Order, OrderRepository> {
         return repository.save(order);
     }
 
+    /** Update order status and payment status (billing side). */
+    @Transactional
+    public Order updateBillingStatus(UUID companyId, UUID orderId, UpdateBillingStatusRequest req) {
+        Order order = repository.findById(orderId)
+            .filter(o -> o.getCompanyId().equals(companyId))
+            .filter(o -> !o.isDeleted())
+            .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+
+        if (req.orderStatus() != null) order.setOrderStatus(req.orderStatus());
+        if (req.paymentStatus() != null) order.setPaymentStatus(req.paymentStatus());
+
+        return repository.save(order);
+    }
+
+    /** Update delivery status and tracking number (shipping side). DELIVERY orders only. */
+    @Transactional
+    public Order updateShippingStatus(UUID companyId, UUID orderId, UpdateShippingStatusRequest req) {
+        Order order = repository.findById(orderId)
+            .filter(o -> o.getCompanyId().equals(companyId))
+            .filter(o -> !o.isDeleted())
+            .filter(o -> o.getOrderType() == OrderType.DELIVERY)
+            .orElseThrow(() -> new IllegalArgumentException("Order not found or is not a DELIVERY order"));
+
+        OrderDelivery delivery = orderDeliveryRepository.findByOrderId(orderId)
+            .orElseThrow(() -> new IllegalStateException("Delivery record not found for this order"));
+
+        if (req.deliveryStatus() != null) {
+            delivery.setDeliveryStatus(req.deliveryStatus());
+            if (req.deliveryStatus() == DeliveryStatus.DELIVERED) {
+                delivery.setDeliveredAt(OffsetDateTime.now());
+            }
+        }
+        if (req.trackingNumber() != null) delivery.setTrackingNumber(req.trackingNumber());
+        orderDeliveryRepository.save(delivery);
+
+        return repository.save(order);
+    }
+
     // ── Inner request DTOs (used by controller and service) ───────────────────
 
     public record CreateOrderRequest(
@@ -289,4 +331,196 @@ public class OrderService extends BaseServiceImpl<Order, OrderRepository> {
         DeliveryStatus deliveryStatus,
         String trackingNumber
     ) {}
+
+    /** PATCH /orders/{id}/billing-status — order status + payment status */
+    public record UpdateBillingStatusRequest(
+        OrderStatus orderStatus,
+        PaymentStatus paymentStatus
+    ) {}
+
+    /** PATCH /orders/{id}/shipping-status — delivery status + tracking number */
+    public record UpdateShippingStatusRequest(
+        DeliveryStatus deliveryStatus,
+        String trackingNumber
+    ) {}
+
+    // ── Edit request DTOs ──────────────────────────────────────────────────────
+
+    /** PUT /orders/{id}/info — customer, payment type, notes, discount, order date */
+    public record UpdateOrderInfoRequest(
+        UUID customerId,
+        PaymentType paymentType,
+        String notes,
+        DiscountType discountType,
+        BigDecimal discountValue,
+        OffsetDateTime orderDate
+    ) {}
+
+    /** PUT /orders/{id}/items — full item reconciliation */
+    public record UpdateOrderItemsRequest(
+        List<OrderItemEditRequest> items
+    ) {
+        /**
+         * id = null  → new item (add)
+         * id present → update that existing item
+         * existing items not in this list → removed
+         */
+        public record OrderItemEditRequest(
+            UUID id,
+            UUID productId,
+            BigDecimal quantity,
+            BigDecimal unitPrice,
+            DiscountType discountType,
+            BigDecimal discountValue,
+            String notes
+        ) {}
+    }
+
+    /** PUT /orders/{id}/delivery — recipient and fee, DELIVERY orders only */
+    public record UpdateOrderDeliveryRequest(
+        UUID deliveryCompanyId,
+        String recipientName,
+        String recipientPhone,
+        String deliveryAddress,
+        UUID provinceId,
+        UUID districtId,
+        BigDecimal deliveryFeeCharged,
+        String deliveryNotes
+    ) {}
+
+    // ── Edit service methods ───────────────────────────────────────────────────
+
+    /** Update order header info: customer, payment type, notes, discount, order date. */
+    @Transactional
+    public Order updateOrderInfo(UUID companyId, UUID orderId, UpdateOrderInfoRequest req) {
+        Order order = repository.findById(orderId)
+            .filter(o -> o.getCompanyId().equals(companyId))
+            .filter(o -> !o.isDeleted())
+            .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+
+        if (req.customerId() != null) {
+            User customer = userRepository.findById(req.customerId())
+                .filter(u -> u.getUserType() == UserType.CUSTOMER)
+                .filter(u -> u.getCompany() != null && u.getCompany().getId().equals(companyId))
+                .orElseThrow(() -> new IllegalArgumentException("Customer not found or does not belong to this company"));
+            order.setCustomer(customer);
+        }
+        if (req.paymentType() != null) order.setPaymentType(req.paymentType());
+        if (req.notes() != null) order.setNotes(req.notes());
+        if (req.orderDate() != null) order.setOrderDate(req.orderDate());
+
+        boolean discountChanged = req.discountType() != null || req.discountValue() != null;
+        if (req.discountType() != null) order.setDiscountType(req.discountType());
+        if (req.discountValue() != null) order.setDiscountValue(req.discountValue());
+
+        if (discountChanged) {
+            BigDecimal orderDiscount = calculateDiscount(order.getSubtotal(), order.getDiscountType(), order.getDiscountValue());
+            order.setOrderDiscount(orderDiscount);
+            order.setGrandTotal(order.getSubtotal().subtract(orderDiscount).add(order.getDeliveryFee()));
+        }
+
+        return repository.save(order);
+    }
+
+    /** Replace order items. Existing items not in the list are removed. */
+    @Transactional
+    public Order updateOrderItems(UUID companyId, UUID orderId, UpdateOrderItemsRequest req) {
+        if (req.items() == null || req.items().isEmpty()) {
+            throw new IllegalArgumentException("Order must have at least one item");
+        }
+
+        Order order = repository.findById(orderId)
+            .filter(o -> o.getCompanyId().equals(companyId))
+            .filter(o -> !o.isDeleted())
+            .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+
+        List<OrderItem> existingItems = orderItemRepository.findByOrderIdOrderByCreatedAtAsc(orderId);
+        Map<UUID, OrderItem> existingById = existingItems.stream()
+            .collect(Collectors.toMap(OrderItem::getId, i -> i));
+
+        Set<UUID> keptIds = req.items().stream()
+            .filter(r -> r.id() != null)
+            .map(UpdateOrderItemsRequest.OrderItemEditRequest::id)
+            .collect(Collectors.toSet());
+
+        existingItems.stream()
+            .filter(i -> !keptIds.contains(i.getId()))
+            .forEach(orderItemRepository::delete);
+        orderItemRepository.flush();
+
+        BigDecimal subtotal = BigDecimal.ZERO;
+        for (UpdateOrderItemsRequest.OrderItemEditRequest itemReq : req.items()) {
+            OrderItem item;
+            if (itemReq.id() != null) {
+                item = existingById.get(itemReq.id());
+                if (item == null) {
+                    throw new IllegalArgumentException("Order item not found: " + itemReq.id());
+                }
+            } else {
+                item = new OrderItem();
+                item.setOrder(order);
+            }
+
+            if (itemReq.productId() != null) {
+                Product product = productRepository.findById(itemReq.productId())
+                    .orElseThrow(() -> new IllegalArgumentException("Product not found: " + itemReq.productId()));
+                item.setProduct(product);
+                item.setProductName(product.getName());
+                item.setProductSku(null);
+                if (itemReq.unitPrice() != null) {
+                    item.setUnitPrice(itemReq.unitPrice());
+                } else if (item.getUnitPrice() == null) {
+                    item.setUnitPrice(product.getSellingPrice());
+                }
+            }
+            if (itemReq.quantity() != null) item.setQuantity(itemReq.quantity());
+            if (itemReq.discountType() != null) item.setDiscountType(itemReq.discountType());
+            if (itemReq.discountValue() != null) item.setDiscountValue(itemReq.discountValue());
+            if (itemReq.notes() != null) item.setNotes(itemReq.notes());
+            item.recalculate();
+
+            orderItemRepository.save(item);
+            subtotal = subtotal.add(item.getLineTotal());
+        }
+
+        BigDecimal orderDiscount = calculateDiscount(subtotal, order.getDiscountType(), order.getDiscountValue());
+        order.setSubtotal(subtotal);
+        order.setOrderDiscount(orderDiscount);
+        order.setGrandTotal(subtotal.subtract(orderDiscount).add(order.getDeliveryFee()));
+        return repository.save(order);
+    }
+
+    /** Update delivery recipient and fee. Order must be of type DELIVERY. */
+    @Transactional
+    public Order updateOrderDelivery(UUID companyId, UUID orderId, UpdateOrderDeliveryRequest req) {
+        Order order = repository.findById(orderId)
+            .filter(o -> o.getCompanyId().equals(companyId))
+            .filter(o -> !o.isDeleted())
+            .filter(o -> o.getOrderType() == OrderType.DELIVERY)
+            .orElseThrow(() -> new IllegalArgumentException("Order not found or is not a DELIVERY order"));
+
+        OrderDelivery delivery = orderDeliveryRepository.findByOrderId(orderId)
+            .orElseThrow(() -> new IllegalStateException("Delivery record not found for this order"));
+
+        if (req.deliveryCompanyId() != null) delivery.setDeliveryCompanyId(req.deliveryCompanyId());
+        if (req.recipientName() != null) delivery.setRecipientName(req.recipientName());
+        if (req.recipientPhone() != null) delivery.setRecipientPhone(req.recipientPhone());
+        if (req.deliveryAddress() != null) delivery.setDeliveryAddress(req.deliveryAddress());
+        if (req.deliveryNotes() != null) delivery.setDeliveryNotes(req.deliveryNotes());
+        if (req.provinceId() != null) {
+            delivery.setProvince(provinceRepository.findById(req.provinceId()).orElse(null));
+        }
+        if (req.districtId() != null) {
+            delivery.setDistrict(districtRepository.findById(req.districtId()).orElse(null));
+        }
+        if (req.deliveryFeeCharged() != null) {
+            delivery.setDeliveryFeeCharged(req.deliveryFeeCharged());
+            order.setDeliveryFee(req.deliveryFeeCharged());
+            order.setGrandTotal(order.getSubtotal().subtract(order.getOrderDiscount()).add(req.deliveryFeeCharged()));
+            repository.save(order);
+        }
+        orderDeliveryRepository.save(delivery);
+
+        return repository.findById(orderId).orElseThrow();
+    }
 }

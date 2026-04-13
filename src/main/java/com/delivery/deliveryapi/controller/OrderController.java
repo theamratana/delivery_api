@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,7 +36,12 @@ import com.delivery.deliveryapi.repo.OrderRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
 import com.delivery.deliveryapi.service.OrderService;
 import com.delivery.deliveryapi.service.OrderService.CreateOrderRequest;
+import com.delivery.deliveryapi.service.OrderService.UpdateBillingStatusRequest;
 import com.delivery.deliveryapi.service.OrderService.UpdateDeliveryStatusRequest;
+import com.delivery.deliveryapi.service.OrderService.UpdateOrderDeliveryRequest;
+import com.delivery.deliveryapi.service.OrderService.UpdateOrderInfoRequest;
+import com.delivery.deliveryapi.service.OrderService.UpdateOrderItemsRequest;
+import com.delivery.deliveryapi.service.OrderService.UpdateShippingStatusRequest;
 
 @RestController
 @RequestMapping("/orders")
@@ -70,6 +76,71 @@ public class OrderController {
         }
     }
 
+    // ── PUT /orders/{id}/info ─────────────────────────────────────────────────
+
+    @PutMapping("/{id}/info")
+    public ResponseEntity<?> updateOrderInfo(
+            @PathVariable UUID id,
+            @RequestBody UpdateOrderInfoRequest req) {
+        User current = getCurrentUser();
+        if (current.getCompany() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "User is not part of any company"));
+        }
+        try {
+            Order order = orderService.updateOrderInfo(current.getCompany().getId(), id, req);
+            return ResponseEntity.ok(toDetail(order));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // ── PUT /orders/{id}/items ────────────────────────────────────────────────
+
+    @PutMapping("/{id}/items")
+    public ResponseEntity<?> updateOrderItems(
+            @PathVariable UUID id,
+            @RequestBody UpdateOrderItemsRequest req) {
+        User current = getCurrentUser();
+        if (current.getCompany() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "User is not part of any company"));
+        }
+        try {
+            Order order = orderService.updateOrderItems(current.getCompany().getId(), id, req);
+            return ResponseEntity.ok(toDetail(order));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // ── PUT /orders/{id}/delivery ─────────────────────────────────────────────
+
+    @PutMapping("/{id}/delivery")
+    public ResponseEntity<?> updateOrderDelivery(
+            @PathVariable UUID id,
+            @RequestBody UpdateOrderDeliveryRequest req) {
+        User current = getCurrentUser();
+        if (current.getCompany() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "User is not part of any company"));
+        }
+        try {
+            Order order = orderService.updateOrderDelivery(current.getCompany().getId(), id, req);
+            return ResponseEntity.ok(toDetail(order));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // ── PATCH /orders/{id}/status ────────────────────────────────────
 
     @PatchMapping("/{id}/status")
@@ -83,6 +154,50 @@ public class OrderController {
         }
         try {
             Order order = orderService.updateDeliveryStatus(current.getCompany().getId(), id, req);
+            return ResponseEntity.ok(toDetail(order));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // ── PATCH /orders/{id}/billing-status ────────────────────────────────────
+
+    @PatchMapping("/{id}/billing-status")
+    public ResponseEntity<?> updateBillingStatus(
+            @PathVariable UUID id,
+            @RequestBody UpdateBillingStatusRequest req) {
+        User current = getCurrentUser();
+        if (current.getCompany() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "User is not part of any company"));
+        }
+        try {
+            Order order = orderService.updateBillingStatus(current.getCompany().getId(), id, req);
+            return ResponseEntity.ok(toDetail(order));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // ── PATCH /orders/{id}/shipping-status ───────────────────────────────────
+
+    @PatchMapping("/{id}/shipping-status")
+    public ResponseEntity<?> updateShippingStatus(
+            @PathVariable UUID id,
+            @RequestBody UpdateShippingStatusRequest req) {
+        User current = getCurrentUser();
+        if (current.getCompany() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "User is not part of any company"));
+        }
+        try {
+            Order order = orderService.updateShippingStatus(current.getCompany().getId(), id, req);
             return ResponseEntity.ok(toDetail(order));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
