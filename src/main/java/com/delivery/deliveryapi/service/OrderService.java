@@ -38,6 +38,7 @@ import com.delivery.deliveryapi.repo.ProductRepository;
 import com.delivery.deliveryapi.repo.ProvinceRepository;
 import com.delivery.deliveryapi.repo.UserRepository;
 import com.delivery.deliveryapi.service.base.BaseServiceImpl;
+import org.springframework.data.domain.PageRequest;
 
 @Service
 public class OrderService extends BaseServiceImpl<Order, OrderRepository> {
@@ -522,5 +523,105 @@ public class OrderService extends BaseServiceImpl<Order, OrderRepository> {
         orderDeliveryRepository.save(delivery);
 
         return repository.findById(orderId).orElseThrow();
+    }
+
+    // ── Statistics ────────────────────────────────────────────────────────────
+
+    public OrderStatsResult getOrderStats(UUID companyId, OffsetDateTime from, OffsetDateTime to, int limit) {
+        var pageable = PageRequest.of(0, limit);
+
+        // Summary
+        Object[] sumRow = repository.statsSummary(companyId, from, to).get(0);
+        var summary = new OrderStatsResult.StatsSummary(
+            ((Number) sumRow[0]).longValue(),
+            sumRow[1] instanceof BigDecimal bd ? bd : BigDecimal.valueOf(((Number) sumRow[1]).doubleValue()),
+            sumRow[2] instanceof BigDecimal bd ? bd : BigDecimal.valueOf(((Number) sumRow[2]).doubleValue())
+        );
+
+        // By order status
+        List<OrderStatsResult.StatusBreakdown> byStatus = repository.statsByStatus(companyId, from, to)
+            .stream()
+            .map(r -> new OrderStatsResult.StatusBreakdown(
+                (OrderStatus) r[0],
+                ((Number) r[1]).longValue(),
+                (BigDecimal) r[2]))
+            .collect(Collectors.toList());
+
+        // By order type
+        List<OrderStatsResult.TypeBreakdown> byType = repository.statsByType(companyId, from, to)
+            .stream()
+            .map(r -> new OrderStatsResult.TypeBreakdown(
+                (OrderType) r[0],
+                ((Number) r[1]).longValue(),
+                (BigDecimal) r[2]))
+            .collect(Collectors.toList());
+
+        // By payment status
+        List<OrderStatsResult.PaymentStatusBreakdown> byPaymentStatus = repository.statsByPaymentStatus(companyId, from, to)
+            .stream()
+            .map(r -> new OrderStatsResult.PaymentStatusBreakdown(
+                (PaymentStatus) r[0],
+                ((Number) r[1]).longValue(),
+                (BigDecimal) r[2]))
+            .collect(Collectors.toList());
+
+        // By delivery company
+        List<OrderStatsResult.DeliveryCompanyBreakdown> byDeliveryCompany = orderDeliveryRepository
+            .statsByDeliveryCompany(companyId, from, to)
+            .stream()
+            .map(r -> new OrderStatsResult.DeliveryCompanyBreakdown(
+                (UUID) r[0],
+                ((Number) r[1]).longValue(),
+                (BigDecimal) r[2]))
+            .collect(Collectors.toList());
+
+        // Best-selling products
+        List<OrderStatsResult.BestSellingProduct> bestSellingProducts = orderItemRepository
+            .statsBestSellingProducts(companyId, from, to, pageable)
+            .stream()
+            .map(r -> new OrderStatsResult.BestSellingProduct(
+                (UUID) r[0],
+                (String) r[1],
+                (String) r[2],
+                (BigDecimal) r[3],
+                (BigDecimal) r[4]))
+            .collect(Collectors.toList());
+
+        // Most loyal customers
+        List<OrderStatsResult.LoyalCustomer> loyalCustomers = repository
+            .statsLoyalCustomers(companyId, from, to, pageable)
+            .stream()
+            .map(r -> new OrderStatsResult.LoyalCustomer(
+                (UUID) r[0],
+                (String) r[1],
+                (String) r[2],
+                ((Number) r[3]).longValue(),
+                (BigDecimal) r[4]))
+            .collect(Collectors.toList());
+
+        return new OrderStatsResult(summary, byStatus, byType, byPaymentStatus,
+            byDeliveryCompany, bestSellingProducts, loyalCustomers);
+    }
+
+    // ── Stats result record ───────────────────────────────────────────────────
+
+    public record OrderStatsResult(
+        StatsSummary summary,
+        List<StatusBreakdown> byStatus,
+        List<TypeBreakdown> byType,
+        List<PaymentStatusBreakdown> byPaymentStatus,
+        List<DeliveryCompanyBreakdown> byDeliveryCompany,
+        List<BestSellingProduct> bestSellingProducts,
+        List<LoyalCustomer> loyalCustomers
+    ) {
+        public record StatsSummary(long totalOrders, BigDecimal totalRevenue, BigDecimal avgOrderValue) {}
+        public record StatusBreakdown(OrderStatus status, long count, BigDecimal revenue) {}
+        public record TypeBreakdown(OrderType type, long count, BigDecimal revenue) {}
+        public record PaymentStatusBreakdown(PaymentStatus paymentStatus, long count, BigDecimal revenue) {}
+        public record DeliveryCompanyBreakdown(UUID deliveryCompanyId, long count, BigDecimal totalFee) {}
+        public record BestSellingProduct(UUID productId, String productName, String productSku,
+                                         BigDecimal totalQty, BigDecimal totalRevenue) {}
+        public record LoyalCustomer(UUID customerId, String customerName, String customerPhone,
+                                    long orderCount, BigDecimal totalRevenue) {}
     }
 }

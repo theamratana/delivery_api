@@ -185,8 +185,8 @@ case "$cmd" in
 		echo "   Starting in foreground (Ctrl+C to stop)..."
 		echo "================================================"
 		
-		# Run with debug JVM options
-		./gradlew bootRun --args="--debug" -Dorg.gradle.jvmargs="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+		# Run with debug JVM options (spring-boot.run.jvmArguments passes args to the app JVM)
+		./gradlew bootRun "-Dspring-boot.run.jvmArguments=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
 		;;
 	start|*)
 		# Start PostgreSQL in Docker, run API locally with Gradle

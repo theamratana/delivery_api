@@ -39,6 +39,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
             .requestMatchers("/api/auth/otp/**", "/api/auth/telegram/verify", "/api/auth/login", "/api/auth/set-password", "/api/auth/change-password", "/api/auth/dev/**", "/api/auth/refresh", "/api/bot/**", "/uploads/**", "/api/enums/**").permitAll()
             .requestMatchers("/api/auth/profile", "/api/auth/companies/**").authenticated()
+            .requestMatchers("/api/stats/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository), UsernamePasswordAuthenticationFilter.class);

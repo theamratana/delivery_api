@@ -55,6 +55,14 @@
 			"group": "none"
 		},
 		{
+			"label": "docker: start postgres",
+			"type": "shell",
+			"command": "docker compose up -d postgres",
+			"group": "none",
+			"problemMatcher": [],
+			"detail": "Start PostgreSQL container in Docker"
+		},
+		{
 			"label": "Run (Docker 5433 -> 8081)",
 			"type": "shell",
 			"command": "./gradlew",
@@ -67,6 +75,23 @@
 					"DB_USERNAME": "postgres",
 					"DB_PASSWORD": "postgres",
 					"SERVER_PORT": "8081"
+				}
+			}
+		},
+		{
+			"label": "bootRunDebug (Docker 5433 -> 8081)",
+			"type": "shell",
+			"command": "./run-api.sh",
+			"args": ["debug"],
+			"group": "none",
+			"isBackground": true,
+			"detail": "Start app in debug mode via run-api.sh (starts Docker, builds, opens JDWP on port 5005)",
+			"problemMatcher": {
+				"pattern": [{ "regexp": ".", "file": 1, "location": 2, "message": 3 }],
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "\\$",
+					"endsPattern": ".*Started DeliveryApiApplication.*"
 				}
 			}
 		}
