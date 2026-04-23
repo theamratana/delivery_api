@@ -1,0 +1,58 @@
+version: '3.8'
+
+# Production Docker Compose
+# Usage: managed via ./deploy.sh — do not run docker compose directly
+#
+# Reads all variables from .env (auto-loaded by docker compose)
+# DB_URL is overridden here to always use the internal Docker network hostname
+
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: roluun-db
+    hostname: roluun-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-deliverydb}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks:
+      - roluun-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: roluun-api:latest
+    container_name: roluun-api
+    hostname: roluun-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Always route DB through internal Docker network — overrides .env
+      DB_URL: jdbc:postgresql://roluun-db:5432/${DB_NAME:-deliverydb}
+    ports:
+      - "${SERVER_PORT:-8081}:${SERVER_PORT:-8081}"
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - roluun-network
+
+networks:
+  roluun-network:
+    driver: bridge
+
+volumes:
+  pgdata:
+    name: roluun-pgdata

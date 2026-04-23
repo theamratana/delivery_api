@@ -24,6 +24,10 @@ server_*.log
 *.class
 .env
 
+# Deployment artifacts
+/backups/
+/deploy.log
+
 # Uploads
 uploads/images/
 bin/
