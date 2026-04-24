@@ -18,6 +18,8 @@ import com.delivery.deliveryapi.security.JwtService;
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
+    private static final String API = "/api";
+
     private final JwtService jwtService;
     private final UserRepository userRepository;
 
@@ -37,9 +39,14 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/api/auth/otp/**", "/api/auth/telegram/verify", "/api/auth/login", "/api/auth/set-password", "/api/auth/change-password", "/api/auth/dev/**", "/api/auth/refresh", "/api/bot/**", "/uploads/**", "/api/enums/**").permitAll()
-            .requestMatchers("/api/auth/profile", "/api/auth/companies/**").authenticated()
-            .requestMatchers("/api/stats/**").authenticated()
+            .requestMatchers(
+                API + "/auth/otp/**", API + "/auth/telegram/verify", API + "/auth/login",
+                API + "/auth/set-password", API + "/auth/change-password", API + "/auth/dev/**",
+                API + "/auth/refresh", API + "/bot/**", "/uploads/**",
+                API + "/enums/**", API + "/health/**"
+            ).permitAll()
+            .requestMatchers(API + "/auth/profile", API + "/auth/companies/**").authenticated()
+            .requestMatchers(API + "/stats/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository), UsernamePasswordAuthenticationFilter.class);
