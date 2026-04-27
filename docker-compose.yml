@@ -55,7 +55,7 @@ services:
       - "80:80"
     volumes:
       - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./flutter-web:/usr/share/nginx/flutter-web:ro
+      - /opt/roluun/flutter-web:/usr/share/nginx/flutter-web:ro
       - ./marketing:/usr/share/nginx/marketing:ro
     depends_on:
       - api

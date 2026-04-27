@@ -7,7 +7,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ARCHIVE="${1:-$SCRIPT_DIR/web_build.tar.gz}"
-DEPLOY_DIR="$SCRIPT_DIR/flutter-web"
+DEPLOY_DIR="/opt/roluun/flutter-web"
 
 echo "=== Flutter Web Deploy ==="
 echo "Archive:    $ARCHIVE"
