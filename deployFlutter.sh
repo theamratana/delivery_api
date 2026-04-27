@@ -8,6 +8,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ARCHIVE="${1:-$SCRIPT_DIR/web_build.tar.gz}"
 DEPLOY_DIR="/opt/roluun/flutter-web"
+COMPOSE_DIR="/opt/roluun"
 
 echo "=== Flutter Web Deploy ==="
 echo "Archive:    $ARCHIVE"
@@ -29,9 +30,14 @@ echo "[2/3] Extracting..."
 tar -xzf "$ARCHIVE" -C "$DEPLOY_DIR"
 rm -f "$ARCHIVE"
 
-# Reload Nginx
+# Reload or restart Nginx
 echo "[3/3] Reloading Nginx..."
-docker exec roluun-nginx nginx -s reload
+if docker exec roluun-nginx nginx -s reload 2>/dev/null; then
+    echo "Nginx reloaded."
+else
+    echo "Nginx not running, restarting container..."
+    cd "$COMPOSE_DIR" && docker compose up -d nginx
+fi
 
 echo ""
 echo "Done! http://app.roluun.com"
