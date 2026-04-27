@@ -27,6 +27,8 @@ server_*.log
 # Deployment artifacts
 /backups/
 /deploy.log
+local-backup.sql
+*-backup.sql
 
 # Uploads
 uploads/images/

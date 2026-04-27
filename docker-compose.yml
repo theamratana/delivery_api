@@ -47,6 +47,21 @@ services:
     networks:
       - roluun-network
 
+  nginx:
+    image: nginx:alpine
+    container_name: roluun-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./flutter-web:/usr/share/nginx/flutter-web:ro
+      - ./marketing:/usr/share/nginx/marketing:ro
+    depends_on:
+      - api
+    networks:
+      - roluun-network
+
   adminer:
     image: adminer:latest
     container_name: roluun-adminer
