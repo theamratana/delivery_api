@@ -2,7 +2,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:16
-    container_name: delivery-postgres
+    container_name: roluun-db
     hostname: roluun-db
     environment:
       POSTGRES_DB: deliverydb

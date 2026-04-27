@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Connect to Postgres running in Docker with psql
-CONTAINER_NAME=${1:-delivery-postgres}
+CONTAINER_NAME=${1:-roluun-db}
 DB_USER=${2:-postgres}
 DB_NAME=${3:-deliverydb}
 

@@ -23,8 +23,8 @@
 - [x] Implement Interactive Reset Menu (added numbered options 0-5 for module selection instead of code editing)
 
 ## Project-Specific Configuration
-- **Database**: Using Docker for PostgreSQL with container name `delivery-postgres`
-  - Access via: `docker exec -it delivery-postgres psql -U postgres -d deliverydb`
+- **Database**: Using Docker for PostgreSQL with container name `roluun-db`
+  - Access via: `docker exec -it roluun-db psql -U postgres -d deliverydb`
   - Configured in docker-compose.yml
   
 - **Lombok**: Project uses Lombok annotations - **DO NOT create getter/setter methods manually**

@@ -284,7 +284,7 @@ echo
 echo "Resetting database..."
 
 # Execute the generated SQL
-echo "$SQL_CONTENT" | docker exec -i delivery-postgres psql -U $DB_USERNAME -d deliverydb
+echo "$SQL_CONTENT" | docker exec -i roluun-db psql -U $DB_USERNAME -d deliverydb
 
 if [ $? -eq 0 ]; then
     echo
