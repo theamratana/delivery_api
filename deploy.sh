@@ -102,13 +102,14 @@ cmd_backup_db() {
 
     DB_USER=$(env_val DB_USERNAME); DB_USER="${DB_USER:-postgres}"
     DB_NAME=$(env_val DB_NAME);     DB_NAME="${DB_NAME:-deliverydb}"
+    DB_PASS=$(env_val DB_PASSWORD); DB_PASS="${DB_PASS:-postgres}"
 
     mkdir -p "$BACKUP_DIR"
     TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
     BACKUP_FILE="${BACKUP_DIR}/db_backup_${TIMESTAMP}.sql.gz"
 
     log "Backing up database '${DB_NAME}' → ${BACKUP_FILE} ..."
-    docker exec -u postgres roluun-db pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$BACKUP_FILE"
+    docker exec -e PGPASSWORD="$DB_PASS" roluun-db pg_dump -h 127.0.0.1 -U "$DB_USER" "$DB_NAME" | gzip > "$BACKUP_FILE"
     log "Database backup saved: ${BACKUP_FILE}"
 }
 
