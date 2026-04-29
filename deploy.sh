@@ -96,7 +96,7 @@ cmd_logs() {
     esac
 }
 
-cmd_backup() {
+cmd_backup_db() {
     require_env
     require_compose
 
@@ -109,8 +109,26 @@ cmd_backup() {
 
     log "Backing up database '${DB_NAME}' → ${BACKUP_FILE} ..."
     docker exec roluun-db pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$BACKUP_FILE"
-    log "Backup saved: ${BACKUP_FILE}"
-    warn "Uploads folder is at ./uploads — copy it separately if needed."
+    log "Database backup saved: ${BACKUP_FILE}"
+}
+
+cmd_backup_uploads() {
+    mkdir -p "$BACKUP_DIR"
+    TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+    BACKUP_FILE="${BACKUP_DIR}/uploads_backup_${TIMESTAMP}.tar.gz"
+
+    [[ -d "./uploads" ]] || error "./uploads directory not found."
+
+    log "Backing up uploads → ${BACKUP_FILE} ..."
+    tar -czf "$BACKUP_FILE" -C . uploads
+    log "Uploads backup saved: ${BACKUP_FILE}"
+}
+
+cmd_backup_all() {
+    log "Running full backup (database + uploads)..."
+    cmd_backup_db
+    cmd_backup_uploads
+    log "Full backup complete."
 }
 
 cmd_restore() {
@@ -146,7 +164,9 @@ Commands:
   rebuild            Rebuild image + start  — use after pulling new code
   status             Show container status
   logs [service]     Tail logs  (api | db | all   default: api)
-  backup             Dump database to ./backups/
+  backup-db          Dump database → ./backups/
+  backup-uploads     Archive ./uploads folder → ./backups/
+  backup-all         Both database + uploads
   restore <file>     Restore database from a backup file
   help               Show this help
 
@@ -161,7 +181,7 @@ First-time setup on a new server:
 Workflow:
   Edit .env → ./deploy.sh restart         (config change)
   git pull  → ./deploy.sh rebuild         (code change)
-  ./deploy.sh backup                      (before any risky change)
+  ./deploy.sh backup-all                  (before any risky change)
 
 EOF
 }
@@ -177,7 +197,9 @@ case "$COMMAND" in
     rebuild) cmd_rebuild ;;
     status)  cmd_status ;;
     logs)    cmd_logs "${1:-api}" ;;
-    backup)  cmd_backup ;;
+    backup-db|backup|db-backup) cmd_backup_db ;;
+    backup-uploads|backup-files) cmd_backup_uploads ;;
+    backup-all) cmd_backup_all ;;
     restore) cmd_restore "${1:-}" ;;
     help|-h|--help) show_help ;;
     *) error "Unknown command: '$COMMAND'  →  run './deploy.sh help'" ;;
