@@ -71,14 +71,25 @@ cmd_restart() {
     cmd_start
 }
 
-cmd_rebuild() {
+cmd_rebuild_api() {
     require_env
     require_compose
-    log "Rebuilding Docker image (this may take a few minutes)..."
+    log "Rebuilding API image only (database untouched)..."
+    docker compose -f "$COMPOSE_FILE" stop api
+    docker compose -f "$COMPOSE_FILE" rm -f api
+    docker compose -f "$COMPOSE_FILE" build --no-cache api
+    docker compose -f "$COMPOSE_FILE" up -d api
+    log "API rebuild complete."
+}
+
+cmd_rebuild_all() {
+    require_env
+    require_compose
+    log "Rebuilding all services..."
     docker compose -f "$COMPOSE_FILE" down
     docker compose -f "$COMPOSE_FILE" build --no-cache api
     docker compose -f "$COMPOSE_FILE" up -d
-    log "Rebuild complete."
+    log "Full rebuild complete."
 }
 
 cmd_status() {
@@ -157,7 +168,8 @@ Commands:
   start              Start all services (postgres + api)
   stop               Stop all services
   restart            Stop + start  — use after editing .env
-  rebuild            Rebuild image + start  — use after pulling new code
+  rebuild            Rebuild API image only (database untouched)
+  rebuild-all        Rebuild all services (full down + up)
   status             Show container status
   logs [service]     Tail logs  (api | db | all   default: api)
   backup-db          Dump database → ./backups/
@@ -176,7 +188,7 @@ First-time setup on a new server:
 
 Workflow:
   Edit .env → ./deploy.sh restart         (config change)
-  git pull  → ./deploy.sh rebuild         (code change)
+  git pull  → ./deploy.sh rebuild         (code change — api only)
   ./deploy.sh backup-all                  (before any risky change)
 
 EOF
@@ -190,7 +202,8 @@ case "$COMMAND" in
     start)   cmd_start ;;
     stop)    cmd_stop ;;
     restart) cmd_restart ;;
-    rebuild) cmd_rebuild ;;
+    rebuild|rebuild-api) cmd_rebuild_api ;;
+    rebuild-all) cmd_rebuild_all ;;
     status)  cmd_status ;;
     logs)    cmd_logs "${1:-api}" ;;
     backup-db|backup|db-backup) cmd_backup_db ;;
