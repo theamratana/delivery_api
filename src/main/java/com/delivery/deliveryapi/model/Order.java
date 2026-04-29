@@ -13,6 +13,8 @@ import com.delivery.deliveryapi.model.enums.PaymentStatus;
 import com.delivery.deliveryapi.model.enums.PaymentType;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+import org.hibernate.annotations.Formula;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -99,6 +101,9 @@ public class Order extends TenantAuditableEntity {
 
     @Column(name = "order_date", nullable = false)
     private OffsetDateTime orderDate = OffsetDateTime.now();
+
+    @Formula("(SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = id)")
+    private int itemCount;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<OrderItem> items = new ArrayList<>();

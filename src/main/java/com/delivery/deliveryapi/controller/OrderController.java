@@ -263,7 +263,8 @@ public class OrderController {
             o.getCustomer() != null ? o.getCustomer().getDisplayName() : null,
             o.getCustomer() != null ? o.getCustomer().getPhoneE164() : null,
             o.getOrderDate(),
-            o.getCreatedAt()
+            o.getCreatedAt(),
+            o.getItemCount()
         );
     }
 
@@ -366,7 +367,8 @@ public class OrderController {
         String customerName,
         String customerPhone,
         OffsetDateTime orderDate,
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        int itemCount
     ) {}
 
     record OrderDetail(
