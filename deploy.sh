@@ -108,7 +108,7 @@ cmd_backup_db() {
     BACKUP_FILE="${BACKUP_DIR}/db_backup_${TIMESTAMP}.sql.gz"
 
     log "Backing up database '${DB_NAME}' → ${BACKUP_FILE} ..."
-    docker exec roluun-db pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$BACKUP_FILE"
+    docker exec -u postgres roluun-db pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$BACKUP_FILE"
     log "Database backup saved: ${BACKUP_FILE}"
 }
 
