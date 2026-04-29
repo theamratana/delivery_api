@@ -209,25 +209,34 @@ public class OtpService {
     public void processContact(long chatId, String phoneNumber) {
         String normalizedPhone = normalizePhone(phoneNumber);
         log.info("Processing contact for chatId: {} phone: {}", chatId, normalizedPhone);
-        // Find waiting attempt for this chat
         log.info("Querying for attempt with chatId: {} status: WAITING_FOR_CONTACT", chatId);
         Optional<OtpAttempt> opt = attempts.findTopByChatIdAndStatusOrderByCreatedAtDesc(chatId, OtpStatus.WAITING_FOR_CONTACT);
+
+        OtpAttempt a;
         if (opt.isEmpty()) {
-            log.warn("No attempt found for chatId: {}", chatId);
-            sendOtpMessageAsync(chatId, "No pending verification request found.");
-            return;
-        }
-        OtpAttempt a = opt.get();
-        log.info("Found attempt id: {} phone: {}", a.getId(), a.getPhoneE164());
-
-        if (!normalizedPhone.equals(a.getPhoneE164())) {
-            a.setStatus(OtpStatus.BLOCKED);
+            // New user initiated directly from Telegram (/start flow) — create attempt now
+            log.info("No pending attempt found for chatId: {} — creating new attempt for phone: {}", chatId, normalizedPhone);
+            a = new OtpAttempt();
+            a.setPhoneE164(normalizedPhone);
+            a.setChatId(chatId);
+            a.setLinkCode(generateLinkCode());
+            a.setStatus(OtpStatus.PENDING);
+            a.setMaxTries(MAX_TRIES);
+            a.setTriesCount(0);
+            a.setExpiresAt(Instant.now().plus(CODE_TTL));
             attempts.save(a);
-            sendOtpMessageAsync(chatId, "The shared phone number does not match the one you entered. Verification failed.");
-            return;
+        } else {
+            a = opt.get();
+            log.info("Found attempt id: {} phone: {}", a.getId(), a.getPhoneE164());
+            if (!normalizedPhone.equals(a.getPhoneE164())) {
+                a.setStatus(OtpStatus.BLOCKED);
+                attempts.save(a);
+                sendOtpMessageAsync(chatId, "The shared phone number does not match the one you entered. Verification failed.");
+                return;
+            }
         }
 
-        // Phone matches, send OTP
+        // Send OTP
         int code = 100000 + RNG.nextInt(900000);
         String codeStr = Integer.toString(code);
         a.setCodeHash(hashCode(codeStr, a.getLinkCode()));

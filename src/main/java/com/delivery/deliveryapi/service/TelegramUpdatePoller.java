@@ -63,6 +63,12 @@ public class TelegramUpdatePoller {
             return;
         }
 
+        if (text != null && text.equals("/start")) {
+            log.info("New user /start from chatId: {}", chatId);
+            tg.sendContactRequest(chatId, "Welcome! Please share your phone number to sign up.");
+            return;
+        }
+
         // Check for contact sharing
         Object contactObj = msg.get("contact");
         if (contactObj instanceof Map<?, ?> contact) {

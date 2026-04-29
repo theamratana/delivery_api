@@ -47,7 +47,7 @@ logging:
     com.delivery.deliveryapi.config.RequestLoggingFilter: INFO
 
 telegram:
-  bot-token: ${TELEGRAM_BOT_TOKEN:8585454641:AAHmpA7V0trkot2KZEID5FOXOFKz8THBUn0}
+  bot-token: ${TELEGRAM_BOT_TOKEN:8585454641:AAGIpOYGrRlD0p3V02RZL4GXPF5ojuBcN0k}
   bot-username: ${TELEGRAM_BOT_USERNAME:RoluunBot}
   polling:
     enabled: ${TELEGRAM_POLLING_ENABLED:true}
